@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  margin: 0;
+  background: #f0ece2;
+  color: #1e1e2e;
+  font-family: 'Inter', 'Poppins', Arial, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #c9c9d6; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* 3D button effects */
+button {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease !important;
+  will-change: transform;
+}
+button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.2) !important;
+}
+button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98) !important;
+  box-shadow: 0 2px 5px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Table rows 3D effect */
+tbody tr {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+tbody tr:hover {
+  transform: scale(1.01) translateZ(10px);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+  background-color: #ffffff;
+  position: relative;
+  z-index: 10;
+}
+
+/* 3D App Cards */
+.app-card {
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+.app-card:hover {
+  transform: translateY(-4px) rotateX(1deg) rotateY(-1deg);
+  box-shadow: 10px 20px 30px -10px rgba(0,0,0,0.15) !important;
+}
