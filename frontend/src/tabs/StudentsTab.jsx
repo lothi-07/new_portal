@@ -3,7 +3,7 @@ import {
   searchStudents, getStudent, createStudent, deleteStudent, uploadStudentPhoto,
   createAchievement, uploadCertificate, generateOutput, deleteAchievement,
   exportStudentsUrl, exportSingleStudentUrl, API_BASE, deleteStudentsByClass,
-  listEventFlyers,
+  listEventFlyers, photoUrl,
 } from '../api'
 
 const DEPTS = ['CSE', 'ECE', 'EEE', 'ME', 'CE', 'AI & DS', 'IT']
@@ -184,15 +184,13 @@ export default function StudentsTab({ focusStudentId = null }) {
                   </tr>
                 )}
                 {!loading && students.map(st => {
-                  const photoUrl = st.photo_path
-                    ? `${API_BASE}/static/photos/${st.roll_no}${st.photo_path.slice(st.photo_path.lastIndexOf('.'))}`
-                    : null
+                  const studentPhotoUrl = photoUrl(st.photo_path)
                   return (
                     <tr key={st.id} style={s.tr} onClick={() => openStudent(st.id)}>
                       <td style={s.td}>
                         <div style={s.avatarWrap}>
-                          {photoUrl
-                            ? <img src={photoUrl} alt="" style={s.avatar} />
+                          {studentPhotoUrl
+                            ? <img src={studentPhotoUrl} alt="" style={s.avatar} />
                             : <div style={s.avatarPlaceholder}>{st.first_name?.[0]}{st.last_name?.[0]}</div>
                           }
                         </div>
@@ -282,9 +280,7 @@ function StudentProfile({ student, onAddAchievement, onUploadCert, onGenerate, o
   const [flyers, setFlyers] = useState([])
   const [previewAchievement, setPreviewAchievement] = useState(null)
 
-  const photoUrl = student.photo_path
-    ? `${API_BASE}/static/photos/${student.roll_no}${student.photo_path.slice(student.photo_path.lastIndexOf('.'))}`
-    : null
+  const studentPhotoUrl = photoUrl(student.photo_path)
 
   useEffect(() => {
     listEventFlyers()
@@ -296,8 +292,8 @@ function StudentProfile({ student, onAddAchievement, onUploadCert, onGenerate, o
     <div>
       <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 24 }}>
         <label style={pm.photoLabel}>
-          {photoUrl
-            ? <img src={photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {studentPhotoUrl
+            ? <img src={studentPhotoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={{ fontSize: 10, color: '#aaa' }}>PHOTO</span>}
           <input type="file" accept="image/*" style={{ display: 'none' }}
                  onChange={e => e.target.files[0] && onPhotoUpload(e.target.files[0])} />
@@ -542,7 +538,11 @@ function AddStudentModal({ onClose, onCreated }) {
       }
       onCreated()
     } catch (e) {
-      alert(e.response?.data?.detail || 'Failed to add student')
+      const detail = e.response?.data?.detail
+      const message = Array.isArray(detail)
+        ? detail.map(item => item.msg).join(', ')
+        : detail
+      alert(message || 'Failed to add student')
     } finally {
       setSaving(false)
     }

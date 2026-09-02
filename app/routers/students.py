@@ -2,7 +2,8 @@ import io
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import func, or_, text
+from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 import openpyxl
 from openpyxl.styles import Font, PatternFill
@@ -10,6 +11,7 @@ from openpyxl.styles import Font, PatternFill
 from .. import models, schemas
 from ..database import get_db
 from ..auth import get_current_admin, get_current_student_or_admin
+from ..storage import public_photo_url
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -49,6 +51,7 @@ def list_students(
     for s in students:
         d = schemas.StudentOut.model_validate(s).model_dump()
         d["achievement_count"] = counts.get(s.id, 0)
+        d["photo_path"] = public_photo_url(d.get("photo_path"), s.roll_no)
         out.append(d)
     return out
 
@@ -96,7 +99,9 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    return student
+    result = schemas.StudentDetail.model_validate(student).model_dump()
+    result["photo_path"] = public_photo_url(result.get("photo_path"), student.roll_no)
+    return result
 
 
 @router.get("/{student_id}/export")
@@ -147,9 +152,36 @@ def create_student(
     db: Session = Depends(get_db),
     admin: str = Depends(get_current_admin),
 ):
-    db_student = models.Student(**student.model_dump())
+    normalized_roll_no = student.roll_no.strip().upper()
+    if db.query(models.Student).filter(
+        models.Student.roll_no == normalized_roll_no
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Student with roll number {normalized_roll_no} already exists",
+        )
+
+    if db.bind and db.bind.dialect.name == "postgresql":
+        db.execute(
+            text(
+                "SELECT setval("
+                "pg_get_serial_sequence('students', 'id'), "
+                "COALESCE((SELECT MAX(id) FROM students), 0) + 1, false)"
+            )
+        )
+
+    student_data = student.model_dump()
+    student_data["roll_no"] = normalized_roll_no
+    db_student = models.Student(**student_data)
     db.add(db_student)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Student could not be added because a record with the same ID or roll number already exists",
+        ) from exc
     db.refresh(db_student)
     return db_student
 

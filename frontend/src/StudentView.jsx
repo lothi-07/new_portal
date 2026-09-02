@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { API_BASE, getStudent, listEventFlyers, uploadStudentPhoto, uploadCertificate, deleteAchievement } from './api'
+import { API_BASE, getStudent, listEventFlyers, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl } from './api'
 
 const EVENT_TYPES = ['Technical', 'Non-Technical', 'Sports', 'Cultural', 'Other']
 const PRIZE_TYPES = ['1st Prize', '2nd Prize', '3rd Prize', 'Participation']
@@ -87,7 +87,7 @@ export default function StudentView({ session, onLogout }) {
     .join('')
     .slice(0, 2)
     .toUpperCase() || 'ST'
-  const profilePhotoUrl = profile.photo_path ? `${API_BASE}${profile.photo_path}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1a2469&color=fff&rounded=true`
+  const profilePhotoUrl = photoUrl(profile.photo_path) || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1a2469&color=fff&rounded=true`
 
   const handleDeleteAchievement = async (achievementId) => {
     if (!achievementId) return

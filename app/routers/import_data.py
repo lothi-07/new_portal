@@ -1,7 +1,11 @@
-import os, io, zipfile, tempfile
+import io
+import os
+import re
+import zipfile
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from .. import models
 from ..database import get_db
@@ -31,26 +35,65 @@ async def import_students(
     contents = await students_file.read()
     try:
         df = pd.read_excel(io.BytesIO(contents))
+        # Some Excel exports include a title/blank row above the real headers.
+        # Detect the header row instead of assuming it is always row 1.
+        for header_index in range(min(10, len(df) + 1)):
+            candidate = pd.read_excel(io.BytesIO(contents), header=header_index, nrows=0)
+            candidate_headers = {
+                re.sub(r"[^a-z0-9]", "", str(column).strip().lower())
+                for column in candidate.columns
+            }
+            if "rollnumber" in candidate_headers and (
+                "name" in candidate_headers
+                or "firstname" in candidate_headers
+                or "studentname" in candidate_headers
+            ):
+                df = pd.read_excel(io.BytesIO(contents), header=header_index)
+                break
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read Excel file: {e}")
 
-    df.columns = [str(c).strip().lower() for c in df.columns]
+    def normalize_header(value):
+        return re.sub(r"[^a-z0-9]", "", str(value).strip().lower())
+
+    original_columns = list(df.columns)
+    df.columns = [normalize_header(column) for column in df.columns]
 
     def find_col(candidates):
-        for c in candidates:
-            if c in df.columns:
-                return c
+        for candidate in candidates:
+            normalized = normalize_header(candidate)
+            if normalized in df.columns:
+                return normalized
         return None
 
-    col_roll = find_col(["roll no", "roll_no", "rollnumber", "username", "roll number", "roll"])
-    col_name = find_col(["name", "student name", "username","firstname"])
-    col_last = find_col(["last name", "lastname"])
-    col_email = find_col(["mail id", "email", "mail"])
-    col_mobile = find_col(["mobile number", "mobile", "phone"])
-    col_reg = find_col(["register no", "reg no", "register_no", "register number"])
+    col_roll = find_col([
+        "roll no", "roll_no", "rollnumber", "roll number",
+        "username", "roll", "admission number",
+    ])
+    col_name = find_col([
+        "name", "student name", "student_name", "username",
+        "first name", "firstname",
+    ])
+    col_last = find_col(["last name", "lastname", "surname"])
+    col_email = find_col(["mail id", "email id", "email", "mail"])
+    col_mobile = find_col([
+        "mobile number", "mobile", "student mobile no",
+        "student mobile number", "phone", "phone number",
+    ])
+    col_reg = find_col([
+        "register no", "reg no", "register_no",
+        "register number", "registration number",
+    ])
 
     if not col_roll or not col_name:
-        raise HTTPException(status_code=400, detail="Could not find roll number / name columns in the file")
+        detected = ", ".join(str(column) for column in original_columns)
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not find roll number / name columns in the file. "
+                f"Detected headers: {detected}. Required headers include Roll Number and Name."
+            ),
+        )
 
     # --- Extract photos zip (if provided), keyed by roll number ---
     from ..storage import upload_photo_bytes
@@ -68,6 +111,15 @@ async def import_students(
                 photo_map[roll_key] = public_url
 
     created, updated, skipped = 0, 0, 0
+    if db.bind and db.bind.dialect.name == "postgresql":
+        db.execute(
+            text(
+                "SELECT setval("
+                "pg_get_serial_sequence('students', 'id'), "
+                "COALESCE((SELECT MAX(id) FROM students), 0) + 1, false)"
+            )
+        )
+
     for _, row in df.iterrows():
         roll_no = str(row.get(col_roll, "")).strip().upper()
         if not roll_no or roll_no == "NAN":

@@ -69,6 +69,17 @@ export const importStudents = (formData) =>
   api.post('/import/students', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 export const API_BASE = API_URL
+export const photoUrl = (photoPath) => {
+  if (!photoPath) return null
+  if (/^https?:\/\//i.test(photoPath)) return photoPath
+  if (photoPath.startsWith('/static/')) return `${API_BASE}${photoPath}`
+  const normalizedPath = photoPath.replaceAll('\\', '/')
+  const marker = '/static/photos/'
+  const filename = normalizedPath.includes(marker)
+    ? normalizedPath.split(marker).pop()
+    : normalizedPath.split('/').pop()
+  return filename ? `${API_BASE}/static/photos/${filename}` : null
+}
 export default api
 export const deleteStudentsByClass = (year, section) =>
   api.delete('/students/bulk/by-class', { params: { year, section } })

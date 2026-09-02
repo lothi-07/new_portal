@@ -105,3 +105,14 @@ coverage/
 # package-lock.json
 # yarn.lock
 # poetry.lock
+
+# Local generated/static media
+app/static/photos/
+app/static/uploads/
+app/static/generated/
+static/photos/
+static/uploads/
+static/generated/
+generated/
+uploads/
+photos/

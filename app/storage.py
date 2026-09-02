@@ -69,3 +69,37 @@ def upload_photo_bytes(file_bytes: bytes, filename: str) -> str:
             raise
 
     return client.storage.from_(BUCKET_NAME).get_public_url(filename)
+
+
+def public_photo_url(photo_path: str | None, roll_no: str | None = None) -> str | None:
+    """Convert legacy local photo paths to their Supabase public URL."""
+    if not photo_path and not roll_no:
+        return None
+    if not photo_path:
+        client = _get_client()
+        if client is not None:
+            return client.storage.from_(BUCKET_NAME).get_public_url(
+                f"{roll_no.strip().upper()}.jpg"
+            )
+        return None
+    if photo_path.startswith(("http://", "https://")):
+        if roll_no:
+            client = _get_client()
+            if client is not None:
+                for extension in (".jpg", ".jpeg", ".png", ".webp"):
+                    filename = f"{roll_no.strip().upper()}{extension}"
+                    return client.storage.from_(BUCKET_NAME).get_public_url(filename)
+        return photo_path
+    if photo_path.startswith("/static/photos/"):
+        filename = photo_path.removeprefix("/static/photos/")
+        client = _get_client()
+        if client is not None and filename:
+            return client.storage.from_(BUCKET_NAME).get_public_url(filename)
+    normalized_path = photo_path.replace("\\", "/")
+    marker = "/static/photos/"
+    if marker in normalized_path:
+        filename = normalized_path.split(marker, 1)[1]
+        client = _get_client()
+        if client is not None and filename:
+            return client.storage.from_(BUCKET_NAME).get_public_url(filename)
+    return photo_path
