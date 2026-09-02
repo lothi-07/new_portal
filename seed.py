@@ -1,12 +1,3 @@
-"""
-Run once to set up the database:
-  python3 seed.py
-
-Creates:
-  1. A default admin login (email/password) so you can log in immediately
-  2. (Optional) loads your existing Section B/C student data if the old
-     achievement_portal.db is present in the same folder — safe to skip otherwise.
-"""
 import sys, os
 sys.path.append(os.path.dirname(__file__))
 
