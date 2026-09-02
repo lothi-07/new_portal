@@ -13,7 +13,7 @@ from app import models
 from app.database import Base
 from app import models
 
-SUPABASE_DB_URL = "postgresql://postgres.petlffpwhhvsgcqwevtg:new_portal%40123@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
+SUPABASE_DB_URL = "YOUR_SUPABASE_DB_URL"
 
 pg_engine = create_engine(SUPABASE_DB_URL, pool_pre_ping=True)
 Base.metadata.create_all(bind=pg_engine)
