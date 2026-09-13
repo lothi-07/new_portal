@@ -16,6 +16,7 @@ export const signup = (data) => api.post('/auth/signup', data)
 export const login = (data) => api.post('/auth/login', data)
 export const googleLogin = (credential) => api.post('/auth/google', { credential })
 export const createStaffAccount = (data) => api.post('/auth/staff', data)
+export const listStaffAccounts = () => api.get('/auth/staff')
 
 // ---- Students ----
 export const searchStudents = (params) => api.get('/students/', { params })
@@ -41,6 +42,7 @@ export const generateOutput = (achievementId) => api.post(`/achievements/${achie
 
 // ---- Dashboard ----
 export const getDashboardStats = (params) => api.get('/dashboard/stats', { params })
+export const getTopFiveStudents = () => api.get('/dashboard/top-five')
 export const exportTopPerformersUrl = (params) => `${API_URL}/dashboard/export/top-performers?${new URLSearchParams(params)}`
 export const exportParticipantsUrl = (params) => `${API_URL}/dashboard/export/participants?${new URLSearchParams(params)}`
 export const exportNonParticipantsUrl = (params) => `${API_URL}/dashboard/export/non-participants?${new URLSearchParams(params)}`
@@ -63,6 +65,25 @@ export const listEventFlyers = () => api.get('/event-flyers/')
 export const uploadEventFlyer = (formData) =>
   api.post('/event-flyers/', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteEventFlyer = (id) => api.delete(`/event-flyers/${id}`)
+export const registerForEvent = (flyerId, screenshot) => {
+  const data = new FormData()
+  if (screenshot) data.append('screenshot', screenshot)
+  return api.post(`/registrations/${flyerId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const getMyRegistrations = () => api.get('/registrations/mine')
+export const getRegistrations = (params) => api.get('/registrations/', { params })
+export const verifyRegistration = (id, approved, rejection_reason = '') => {
+  const data = new FormData()
+  data.append('approved', String(approved))
+  if (rejection_reason) data.append('rejection_reason', rejection_reason)
+  return api.post(`/registrations/${id}/verify`, data)
+}
+
+// ---- Gamification ----
+export const getStudentStats = (studentId) => api.get(`/gamification/stats/${studentId}`)
+export const getLeaderboard = (params) => api.get('/gamification/leaderboard', { params })
+export const getAllBadges = () => api.get('/gamification/badges')
+export const getMotivationalMessage = (studentId) => api.get(`/gamification/motivational-message/${studentId}`)
 
 // ---- Import ----
 export const importStudents = (formData) =>

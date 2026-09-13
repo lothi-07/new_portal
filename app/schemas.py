@@ -8,6 +8,7 @@ class AchievementBase(BaseModel):
     prize_type: Optional[str] = None
     event_date: Optional[str] = None
     organizer: Optional[str] = None
+    college_name: Optional[str] = None
 
 
 class AchievementCreate(AchievementBase):

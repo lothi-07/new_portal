@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -19,8 +20,11 @@ def list_event_flyers(db: Session = Depends(get_db)):
     return [
         {
             "id": flyer.id, "title": flyer.title, "description": flyer.description,
-            "event_date": flyer.event_date, "registration_deadline": flyer.registration_deadline,
+            "event_date": flyer.event_date, "event_end_date": flyer.event_end_date,
+            "registration_deadline": flyer.registration_deadline,
             "organizer": flyer.organizer, "flyer_path": flyer.flyer_path,
+            "event_type": flyer.event_type,
+            "registration_url": flyer.registration_url,
             "flyer_content_type": flyer.flyer_content_type, "uploaded_by": flyer.uploaded_by,
         }
         for flyer in db.query(models.EventFlyer).order_by(models.EventFlyer.created_at.desc()).all()
@@ -32,8 +36,11 @@ async def upload_event_flyer(
     title: str = Form(...),
     description: str | None = Form(None),
     event_date: str | None = Form(None),
+    event_end_date: str | None = Form(None),
     registration_deadline: str | None = Form(None),
     organizer: str | None = Form(None),
+    event_type: str | None = Form(None),
+    registration_url: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_staff_or_admin),
@@ -43,6 +50,10 @@ async def upload_event_flyer(
     extension = os.path.splitext(file.filename or "")[1].lower()
     if extension not in {".jpg", ".jpeg", ".png", ".webp", ".pdf"}:
         raise HTTPException(status_code=400, detail="Unsupported flyer file extension")
+    if registration_url:
+        parsed_url = urlparse(registration_url.strip())
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            raise HTTPException(status_code=400, detail="Registration link must be a valid http or https URL")
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Flyer must be 10 MB or smaller")
@@ -52,7 +63,9 @@ async def upload_event_flyer(
     (FLYER_DIR / filename).write_bytes(contents)
     flyer = models.EventFlyer(
         title=title.strip(), description=description, event_date=event_date,
-        registration_deadline=registration_deadline, organizer=organizer,
+        event_end_date=event_end_date,
+        registration_deadline=registration_deadline, organizer=organizer, event_type=event_type,
+        registration_url=registration_url.strip() if registration_url else None,
         flyer_path=f"/static/event-flyers/{filename}", flyer_content_type=file.content_type,
         uploaded_by=user["email"],
     )

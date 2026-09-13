@@ -68,6 +68,7 @@ export default function EventSearchTab() {
                 <th style={s.th}>Event Name</th>
                 <th style={s.th}>Type</th>
                 <th style={s.th}>Prize</th>
+                <th style={s.th}>College</th>
                 <th style={s.th}>Date</th>
                 <th style={s.th}>Action</th>
               </tr>
@@ -81,6 +82,7 @@ export default function EventSearchTab() {
                   <td style={s.td}>{r.event_name}</td>
                   <td style={s.td}>{r.event_type || '—'}</td>
                   <td style={s.td}>{r.prize_type || '—'}</td>
+                  <td style={s.td}>{r.college_name || '—'}</td>
                   <td style={s.td}>{r.event_date || '—'}</td>
                   <td style={s.td}>
                     <button

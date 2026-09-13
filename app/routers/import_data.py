@@ -2,7 +2,7 @@ import io
 import os
 import re
 import zipfile
-import pandas as pd
+from openpyxl import load_workbook
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -34,35 +34,48 @@ async def import_students(
     # --- Read student data ---
     contents = await students_file.read()
     try:
-        df = pd.read_excel(io.BytesIO(contents))
-        # Some Excel exports include a title/blank row above the real headers.
-        # Detect the header row instead of assuming it is always row 1.
-        for header_index in range(min(10, len(df) + 1)):
-            candidate = pd.read_excel(io.BytesIO(contents), header=header_index, nrows=0)
+        workbook = load_workbook(io.BytesIO(contents), read_only=True, data_only=True)
+        worksheet = workbook.active
+        rows = list(worksheet.iter_rows(values_only=True))
+        header_index = None
+        for candidate_index, candidate_row in enumerate(rows[:10]):
             candidate_headers = {
                 re.sub(r"[^a-z0-9]", "", str(column).strip().lower())
-                for column in candidate.columns
+                for column in candidate_row
+                if column is not None
             }
             if "rollnumber" in candidate_headers and (
                 "name" in candidate_headers
                 or "firstname" in candidate_headers
                 or "studentname" in candidate_headers
             ):
-                df = pd.read_excel(io.BytesIO(contents), header=header_index)
+                header_index = candidate_index
                 break
+        if header_index is None:
+            raise ValueError("Could not detect a header row")
+        headers = list(rows[header_index])
+        data_rows = [
+            dict(zip(headers, row))
+            for row in rows[header_index + 1:]
+            if any(value is not None for value in row)
+        ]
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read Excel file: {e}")
 
     def normalize_header(value):
         return re.sub(r"[^a-z0-9]", "", str(value).strip().lower())
 
-    original_columns = list(df.columns)
-    df.columns = [normalize_header(column) for column in df.columns]
+    original_columns = headers
+    normalized_rows = [
+        {normalize_header(column): value for column, value in row.items()}
+        for row in data_rows
+    ]
+    normalized_columns = [normalize_header(column) for column in original_columns]
 
     def find_col(candidates):
         for candidate in candidates:
             normalized = normalize_header(candidate)
-            if normalized in df.columns:
+            if normalized in normalized_columns:
                 return normalized
         return None
 
@@ -120,7 +133,7 @@ async def import_students(
             )
         )
 
-    for _, row in df.iterrows():
+    for row in normalized_rows:
         roll_no = str(row.get(col_roll, "")).strip().upper()
         if not roll_no or roll_no == "NAN":
             skipped += 1
@@ -130,7 +143,7 @@ async def import_students(
         last_name = str(row.get(col_last, "")).strip() if col_last else None
         email = str(row.get(col_email, "")).strip() if col_email else None
         mobile = row.get(col_mobile) if col_mobile else None
-        if pd.notna(mobile):
+        if mobile is not None:
             try:
                 mobile = str(int(mobile))
             except (ValueError, TypeError):

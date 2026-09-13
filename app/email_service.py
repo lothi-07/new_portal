@@ -5,7 +5,7 @@ from email.message import EmailMessage
 
 def send_achievement_reminder(recipient: str, student_name: str, achievement_count: int, minimum: int) -> None:
     """Send one achievement-target reminder using the configured SMTP provider."""
-    host = os.getenv("SMTP_HOST")
+    host = os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER")
     sender = os.getenv("SMTP_FROM") or os.getenv("SMTP_USERNAME")
     password = os.getenv("SMTP_PASSWORD")
     port = int(os.getenv("SMTP_PORT", "587"))
@@ -28,6 +28,36 @@ def send_achievement_reminder(recipient: str, student_name: str, achievement_cou
         "Regards,\nStudent Achievement Portal"
     )
 
+    with smtplib.SMTP(host, port, timeout=20) as smtp:
+        smtp.ehlo()
+        if os.getenv("SMTP_USE_TLS", "true").lower() not in {"false", "0", "no"}:
+            smtp.starttls()
+            smtp.ehlo()
+        smtp.login(os.getenv("SMTP_USERNAME", sender), password)
+        smtp.send_message(message)
+
+
+def send_certificate_deadline_reminder(
+    recipient: str, student_name: str, event_title: str
+) -> None:
+    host = os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER")
+    sender = os.getenv("SMTP_FROM") or os.getenv("SMTP_USERNAME")
+    password = os.getenv("SMTP_PASSWORD")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    if not host or not sender or not password:
+        raise RuntimeError(
+            "Email is not configured. Set SMTP_HOST/SMTP_SERVER, SMTP_USERNAME, and SMTP_PASSWORD."
+        )
+    message = EmailMessage()
+    message["Subject"] = f"Certificate upload reminder: {event_title}"
+    message["From"] = sender
+    message["To"] = recipient
+    message.set_content(
+        f"Dear {student_name},\n\n"
+        f"You registered for {event_title} four days ago, but no certificate has been uploaded yet. "
+        "Please upload your participation certificate to the Student Achievement Portal.\n\n"
+        "Regards,\nStudent Achievement Portal"
+    )
     with smtplib.SMTP(host, port, timeout=20) as smtp:
         smtp.ehlo()
         if os.getenv("SMTP_USE_TLS", "true").lower() not in {"false", "0", "no"}:

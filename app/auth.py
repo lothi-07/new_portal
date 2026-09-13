@@ -76,17 +76,11 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
-# ---- Shared dependency: works for BOTH normal-login tokens and Google tokens ----
+# ---- Role-aware access dependencies ----
 def get_current_admin(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ) -> str:
-    """
-    Accepts:
-      - A normal-login JWT issued by /auth/login (contains 'email', 'type': 'local')
-      - A Google ID token from Google Sign-In (contains 'email' after verification)
-    Returns the verified email on success.
-    """
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
@@ -96,23 +90,18 @@ def get_current_admin(
 
     token = parts[1]
 
-    # Try our own JWT first (normal login)
-    try:
-        payload = decode_access_token(token)
-        email = payload.get("email")
-        role = payload.get("role", "admin")  # Existing sessions predate roles.
-        if email and role == "admin":
-            return email
-        if email:
-            raise HTTPException(status_code=403, detail="Administrator access required")
-    except HTTPException:
-        pass  # fall through to try Google token
-
-    # Fall back to Google OAuth token
-    info = verify_google_token(token)
-    email = info.get("email")
+    payload = decode_access_token(token)
+    email = payload.get("email")
     if not email:
-        raise HTTPException(status_code=401, detail="Token did not contain an email")
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    if payload.get("role") == "admin":
+        return email
+    # Preserve existing administrator sessions created before role claims existed.
+    legacy_admin = db.query(models.AdminUser).filter(
+        models.AdminUser.email == email, models.AdminUser.is_active.is_(True)
+    ).first()
+    if not legacy_admin:
+        raise HTTPException(status_code=403, detail="Administrator access required")
     return email
 
 
@@ -179,18 +168,9 @@ def get_current_staff_or_admin(
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid Authorization header format")
 
-    try:
-        payload = decode_access_token(parts[1])
-        email = payload.get("email")
-        role = payload.get("role", "admin")
-        if email and role in {"admin", "staff"}:
-            return {"email": email, "role": role}
-    except HTTPException:
-        pass
-
-    # Google-authenticated accounts retain the existing administrator access behaviour.
-    info = verify_google_token(parts[1])
-    email = info.get("email")
-    if not email:
-        raise HTTPException(status_code=401, detail="Token did not contain an email")
-    return {"email": email, "role": "admin"}
+    payload = decode_access_token(parts[1])
+    email = payload.get("email")
+    role = payload.get("role")
+    if not email or role not in {"admin", "staff"}:
+        raise HTTPException(status_code=403, detail="Staff or administrator access required")
+    return {"email": email, "role": role}

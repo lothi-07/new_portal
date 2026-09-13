@@ -8,11 +8,15 @@ import ImportTab from './tabs/ImportTab.jsx'
 import NotificationsTab from './tabs/NotificationsTab.jsx'
 import EventFlyersTab from './tabs/EventFlyersTab.jsx'
 import StaffAccountsTab from './tabs/StaffAccountsTab.jsx'
+import StaffDashboardTab from './tabs/StaffDashboardTab.jsx'
 import StudentView from "./StudentView.jsx";
+import RegistrationReviewTab from './tabs/RegistrationReviewTab.jsx'
 const NAV_ITEMS = [
+  { key: 'staff-dashboard', label: 'Dashboard', icon: DashboardIcon, staffOnly: true },
   { key: 'students',     label: 'Students',        icon: StudentIcon, adminOnly: true },
   { key: 'dashboard',    label: 'Dashboard',       icon: DashboardIcon, adminOnly: true },
   { key: 'events',       label: 'Student Participation',    icon: SearchIcon, adminOnly: true },
+  { key: 'registrations', label: 'Event Registrations', icon: SearchIcon },
   { key: 'certificates', label: 'Certificates',    icon: CertIcon, adminOnly: true },
   { key: 'flyers',       label: 'Event Flyers',    icon: FlyerIcon },
 ]
@@ -67,8 +71,8 @@ export default function App() {
   if (session.role === 'student') {
   return <StudentView session={session} onLogout={logout} />
 }
-  const isAdmin = session.role !== 'staff'
-  const visibleNavItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin)
+  const isAdmin = session.role === 'admin'
+  const visibleNavItems = NAV_ITEMS.filter(item => (!item.adminOnly || isAdmin) && (!item.staffOnly || !isAdmin))
   const visibleAdminItems = ADMIN_ITEMS.filter(item => !item.adminOnly || isAdmin)
 
   return (
@@ -139,9 +143,11 @@ export default function App() {
         </div>
 
         <main style={s.main}>
+          {activeTab === 'staff-dashboard' && <StaffDashboardTab />}
           {activeTab === 'students'     && <StudentsTab focusStudentId={studentProfileTarget} />}
           {activeTab === 'dashboard'    && <DashboardTab />}
           {activeTab === 'events'       && <EventSearchTab />}
+          {activeTab === 'registrations' && <RegistrationReviewTab />}
           {activeTab === 'certificates' && <CertificatesTab />}
           {activeTab === 'import'       && <ImportTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
@@ -154,8 +160,8 @@ export default function App() {
 }
 
 /* ── Styles ── */
-const NAVY = '#1a2469'
-const NAVY_LIGHT = '#1e2a78'
+const CYAN = '#0d4d5d'
+const _LIGHT = '#0f6878'
 
 const s = {
   layout: {
@@ -169,7 +175,7 @@ const s = {
   sidebar: {
     width: 192,
     minWidth: 192,
-    background: NAVY,
+    background: CYAN,
     display: 'flex',
     flexDirection: 'column',
     padding: '0 0 20px 0',
@@ -189,7 +195,7 @@ const s = {
     width: 42,
     height: 42,
     borderRadius: '50%',
-    border: '2px solid #c9a227',
+    border: '2px solid #dfeff1',
     background: 'transparent',
     display: 'flex',
     alignItems: 'center',
@@ -199,7 +205,7 @@ const s = {
   brandLogoText: {
     fontSize: 10,
     fontWeight: 800,
-    color: '#c9a227',
+    color: '#dfeff1',
     letterSpacing: 0.5,
   },
   brandName: {
@@ -272,7 +278,7 @@ const s = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    background: '#f0ece2',
+    background: '#edf7f7',
     minWidth: 0,
   },
   topBar: {

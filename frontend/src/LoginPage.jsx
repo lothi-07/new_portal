@@ -3,12 +3,14 @@ import { GoogleLogin } from '@react-oauth/google'
 import { login, signup, googleLogin, studentLogin } from './api'
 
 export default function LoginPage({ onLoggedIn }) {
-  const [loginType, setLoginType] = useState('staff') // 'staff' | 'student'
+  const [loginType, setLoginType] = useState('student') // 'staff' | 'student'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showSignup, setShowSignup] = useState(false)
+  const [signupName, setSignupName] = useState('')
 
   const [rollNo, setRollNo] = useState('')
   const [mobile, setMobile] = useState('')
@@ -23,11 +25,26 @@ export default function LoginPage({ onLoggedIn }) {
     setLoading(true)
     try {
       const res = await login({ email, password })
-      onLoggedIn({ role: 'staff', ...res.data })
+      onLoggedIn(res.data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid credentials')
     }
+
     setLoading(false)
+  }
+
+  const submitSignup = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await signup({ name: signupName, email, password })
+      onLoggedIn(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Unable to create account')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const submitStudentLogin = async (e) => {
@@ -55,135 +72,88 @@ export default function LoginPage({ onLoggedIn }) {
     setError('')
     try {
       const res = await googleLogin(credentialResponse.credential)
-      onLoggedIn({ role: 'staff', ...res.data })
+      onLoggedIn(res.data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Google login failed')
     }
   }
 
+  if (loginType === 'student' && studentName) {
+    return (
+      <div style={s.welcomePage}>
+        <header style={s.welcomeHeader}>
+          <Brand light />
+          <button type="button" style={s.signOutBtn} onClick={() => { setStudentName(''); setStudentData(null) }}>
+            Sign out
+          </button>
+        </header>
+        <main style={s.welcomeMain}>
+          <p style={s.welcomeEyebrow}>Identity verified - You&apos;re in</p>
+          <h1 style={s.welcomeTitle}>Welcome <span>{studentName}</span></h1>
+          <p style={s.welcomeSubtextNew}>Your achievement trail is ready. Continue to<br />your personal campus noticeboard.</p>
+          <button style={s.welcomeBtnNew} onClick={handleStudentWelcomeComplete}>Enter dashboard &nbsp; -&gt;</button>
+          <div style={s.welcomeFooter}>ESEC STUDENT PORTAL</div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div style={s.page}>
-      <div style={s.card}>
-        {/* Logo */}
-        <div style={s.logoWrap}>
-          <div style={s.logoCircle}>
-            <span style={s.logoText}>ESEC</span>
+      <header style={s.header}><Brand /><span style={s.headerHint}>Your achievements, beautifully organized</span></header>
+      <main style={s.loginLayout}>
+        <section style={s.intro}>
+          <div style={s.introPill}>* &nbsp; Your achievements, beautifully organized</div>
+          <h1 style={s.introTitle}>Every milestone<br />has a story.</h1>
+          <p style={s.introText}>Keep your student profile, participation history, certificates, and campus opportunities together in one trusted noticeboard.</p>
+        </section>
+
+        <section style={s.loginCard}>
+        <p style={s.cardEyebrow}>{loginType === 'student' ? 'Student sign in' : showSignup ? 'Staff registration' : 'Staff sign in'}</p>
+        <h2 style={s.cardTitle}>{showSignup ? 'Create your account' : 'Welcome back'}</h2>
+        <p style={s.cardSubtitle}>{showSignup ? 'Create a staff account to manage event flyers and view the top students.' : 'Use your campus details to enter the portal.'}</p>
+          <div style={s.loginRoleToggleRow}>
+            <button type="button" onClick={() => { setLoginType('student'); setShowSignup(false); setError('') }} style={{ ...s.loginRoleToggleBtn, ...(loginType === 'student' ? s.loginRoleToggleBtnActive : {}) }}>Student</button>
+            <button type="button" onClick={() => { setLoginType('staff'); setShowSignup(false); setError('') }} style={{ ...s.loginRoleToggleBtn, ...(loginType === 'staff' ? s.loginRoleToggleBtnActive : {}) }}>Staff</button>
           </div>
-        </div>
 
-        {/* Title */}
-        <h1 style={s.title}>Achievement Portal</h1>
-        <div style={s.titleUnderline} />
-        <p style={s.subtitle}>ERODE SENGUNTHAR ENGINEERING COLLEGE</p>
-
-        {/* Staff / Student toggle */}
-        <div style={s.roleToggleRow}>
-          <button
-            type="button"
-            onClick={() => { setLoginType('staff'); setError('') }}
-            style={{ ...s.roleToggleBtn, ...(loginType === 'staff' ? s.roleToggleBtnActive : {}) }}
-          >Staff</button>
-          <button
-            type="button"
-            onClick={() => { setLoginType('student'); setError('') }}
-            style={{ ...s.roleToggleBtn, ...(loginType === 'student' ? s.roleToggleBtnActive : {}) }}
-          >Student</button>
-        </div>
-
-        {loginType === 'staff' && (
-          <>
-            {/* Google Sign In */}
-            <div style={s.googleWrap}>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google login failed')}
-                  width="280"
-                />
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div style={s.dividerRow}>
-              <div style={s.dividerLine} />
-              <span style={s.dividerText}>or continue with email</span>
-              <div style={s.dividerLine} />
-            </div>
-
-            {/* Form */}
-            <form onSubmit={submit}>
-              <label style={s.label}>Email</label>
-              <input
-                style={s.input}
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-
-              <label style={s.label}>Password</label>
-              <input
-                style={s.input}
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-
-              {error && <div style={s.error}>{error}</div>}
-
-              <button style={s.loginBtn} disabled={loading}>
-                {loading ? 'Signing in…' : 'Login'}
-              </button>
+          {loginType === 'staff' ? (
+            <>
+              {!showSignup && <><div style={s.loginGoogleWrap}><GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('Google login failed')} width="280" /></div>
+              <div style={s.loginDividerRow}><div style={s.loginDividerLine} /><span style={s.loginDividerText}>OR CONTINUE WITH</span><div style={s.loginDividerLine} /></div></>}
+              <form onSubmit={showSignup ? submitSignup : submit}>
+                {showSignup && <><label style={s.loginLabel}>Your name</label><input style={s.loginInput} type="text" value={signupName} onChange={e => setSignupName(e.target.value)} required /></>}
+                <label style={s.loginLabel}>Campus email</label><input style={s.loginInput} type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                <label style={s.loginLabel}>Password</label><input style={s.loginInput} type="password" value={password} onChange={e => setPassword(e.target.value)} minLength="6" required />
+                {error && <div style={s.loginError}>{error}</div>}
+                <button style={s.loginSubmit} disabled={loading}>{loading ? (showSignup ? 'Creating...' : 'Signing in...') : (showSignup ? 'Create staff account  ->' : 'Sign in to portal  ->')}</button>
+              </form>
+              {showSignup && <button type="button" style={s.accountLink} onClick={() => { setShowSignup(false); setError('') }}>Already have an account? Sign in</button>}
+            </>
+          ) : (
+            <form onSubmit={submitStudentLogin}>
+              <label style={s.loginLabel}>Roll number</label>
+              <input style={s.loginInput} type="text" placeholder="e.g. ES24AD62" value={rollNo} onChange={e => setRollNo(e.target.value)} required />
+              <label style={s.loginLabel}>Mobile number</label>
+              <input style={s.loginInput} type="text" placeholder="Enter your mobile number" value={mobile} onChange={e => setMobile(e.target.value)} required />
+              {error && <div style={s.loginError}>{error}</div>}
+              <button style={s.loginSubmit} disabled={loading}>{loading ? 'Signing in...' : 'Sign in to portal  ->'}</button>
             </form>
-          </>
-        )}
+          )}
+          {loginType === 'staff' && !showSignup && <p style={s.cardFoot}>New staff member? <button type="button" style={s.accountLink} onClick={() => { setEmail(''); setPassword(''); setSignupName(''); setShowSignup(true); setError('') }}>Create an account</button></p>}
+        </section>
+      </main>
+    </div>
+  )
+}
 
-        {loginType === 'student' && !studentName && (
-          <form onSubmit={submitStudentLogin}>
-            <label style={s.label}>Roll Number</label>
-            <input
-              style={s.input}
-              type="text"
-              placeholder="e.g. ES24AD62"
-              value={rollNo}
-              onChange={e => setRollNo(e.target.value)}
-              required
-            />
-
-            <label style={s.label}>Mobile Number</label>
-            <input
-              style={s.input}
-              type="text"
-              placeholder="e.g. Enter your mobile number"
-              value={mobile}
-              onChange={e => setMobile(e.target.value)}
-              required
-            />
-
-            {error && <div style={s.error}>{error}</div>}
-
-            <button style={s.loginBtn} disabled={loading}>
-              {loading ? 'Signing in…' : 'View My Profile'}
-            </button>
-          </form>
-        )}
-
-        {loginType === 'student' && studentName && (
-          <div style={s.welcomeScreen}>
-            <div style={s.welcomeContent}>
-              <p style={s.welcomeGreeting}>Welcome,</p>
-              <h2 style={s.welcomeName}>{studentName}</h2>
-              <p style={s.welcomeSubtext}>Ready to view your achievements?</p>
-              <button
-                style={s.welcomeBtn}
-                onClick={handleStudentWelcomeComplete}
-              >
-                Go to Dashboard
-              </button>
-            </div>
-          </div>
-        )}
+function Brand({ light = false }) {
+  return (
+    <div style={light ? s.welcomeBrand : s.brand}>
+      <div style={light ? s.welcomeLogoCircle : s.loginLogoCircle}>ES</div>
+      <div>
+        <div style={light ? s.welcomeBrandName : s.brandName}>Achievement Portal</div>
+        <div style={light ? s.welcomeBrandSub : s.brandSub}>ERODE SENGUNTHAR ENGINEERING COLLEGE</div>
       </div>
     </div>
   )
@@ -193,9 +163,10 @@ const s = {
   page: {
     minHeight: '100vh',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: "linear-gradient(rgba(17, 24, 39, 0.35), rgba(17, 24, 39, 0.45)), url('https://t4.ftcdn.net/jpg/16/78/99/01/360_F_1678990199_RyqypFwKeVPmYZjfecz4nLAn1Hv2t6IM.jpg') center/cover no-repeat",
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    background: 'linear-gradient(135deg, #f7f0df 0%, #fffaf0 55%, #f5ead8 100%)',
     fontFamily: "'Inter', 'Poppins', sans-serif",
   },
   card: {
@@ -280,7 +251,7 @@ const s = {
   },
   roleToggleBtnActive: {
     background: 'rgba(255,255,255,0.92)',
-    color: '#1a2469',
+    color: '#063e4b',
     boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
   },
   googleWrap: {
@@ -392,4 +363,53 @@ const s = {
     transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
     boxShadow: '0 12px 24px rgba(246, 197, 90, 0.3)',
   },
+  header: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 94, padding: '0 max(28px, calc((100% - 1240px) / 2))',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e6dece',
+    background: 'rgba(255, 250, 237, 0.82)', zIndex: 2,
+  },
+  brand: { display: 'flex', alignItems: 'center', gap: 12 },
+  welcomeBrand: { display: 'flex', alignItems: 'center', gap: 12, color: '#fff' },
+  brandName: { color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700 },
+  welcomeBrandName: { color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700 },
+  brandSub: { color: '#0d4d5d', fontSize: 9, letterSpacing: '0.2em', marginTop: 4 },
+  welcomeBrandSub: { color: '#d9f3f7', fontSize: 9, letterSpacing: '0.2em', marginTop: 4 },
+  headerHint: { color: '#78949a', fontSize: 12 },
+  loginLayout: { width: '100%', maxWidth: 1240, margin: '94px auto 0', padding: '70px 28px', display: 'grid', gridTemplateColumns: '1fr 440px', gap: 80, alignItems: 'center' },
+  intro: { paddingBottom: 22 },
+  introPill: { display: 'inline-block', padding: '7px 14px', borderRadius: 999, color: '#0d4d5d', background: 'rgba(13, 77, 93, 0.08)', fontSize: 11, fontWeight: 700 },
+  introTitle: { margin: '32px 0 22px', color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 'clamp(3rem, 6vw, 5rem)', lineHeight: 0.98, letterSpacing: '-0.06em' },
+  introText: { maxWidth: 520, color: '#52727a', fontSize: 16, lineHeight: 1.75 },
+  introPoints: { display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 34, color: '#39727a', fontSize: 12 },
+  loginCard: { width: '100%', padding: 32, borderRadius: 24, background: '#fffdf8', border: '1px solid #e4dccd', boxShadow: '0 18px 45px rgba(23,62,62,0.11)' },
+  cardEyebrow: { margin: 0, color: '#0d4d5d', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 800 },
+  cardTitle: { margin: '12px 0 8px', color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 30 },
+  cardSubtitle: { margin: 0, color: '#78949a', fontSize: 13, lineHeight: 1.5 },
+  loginLogoCircle: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 15, background: '#0d4d5d', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 17, fontWeight: 800 },
+  welcomeLogoCircle: { width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: '#0d4d5d', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 17, fontWeight: 800 },
+  loginRoleToggleRow: { margin: '22px 0', padding: 4, display: 'flex', gap: 4, borderRadius: 10, background: '#f4efe4' },
+  loginRoleToggleBtn: { flex: 1, padding: '9px 0', border: 0, borderRadius: 7, background: 'transparent', color: '#78949a', fontSize: 12, fontWeight: 700 },
+  loginRoleToggleBtnActive: { background: '#0d4d5d', color: '#fff' },
+  loginGoogleWrap: { display: 'flex', justifyContent: 'center', margin: '18px 0' },
+  loginDividerRow: { display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0', color: '#a3b4b5' },
+  loginDividerLine: { flex: 1, height: 1, background: '#e0e4dc' },
+  loginDividerText: { fontSize: 9, letterSpacing: '0.15em', whiteSpace: 'nowrap' },
+  loginLabel: { display: 'block', margin: '0 0 7px', color: '#426770', fontSize: 11, fontWeight: 700 },
+  loginInput: { width: '100%', padding: '13px 14px', marginBottom: 16, border: '1px solid #dce2d9', borderRadius: 10, background: '#fffefa', color: '#0d4d5d', fontSize: 13, outline: 'none' },
+  loginSubmit: { width: '100%', padding: '13px 16px', border: 0, borderRadius: 10, background: '#0d4d5d', color: '#fff', fontSize: 13, fontWeight: 700 },
+  loginError: { marginBottom: 12, padding: 8, borderRadius: 8, color: '#a33d3d', background: '#fff0ed', fontSize: 12, textAlign: 'center' },
+  cardFoot: { margin: '20px 0 0', color: '#78949a', fontSize: 11, textAlign: 'center' },
+  accountLink: { border: 0, padding: 0, background: 'transparent', color: '#0d6878', fontWeight: 700, cursor: 'pointer', fontSize: 'inherit' },
+  'cardFoot span': { color: '#0d4d5d', fontWeight: 700 },
+  welcomePage: { minHeight: '100vh', color: '#fff', background: 'linear-gradient(135deg, #0d4d5d 0%, #0f5b67 100%)' },
+  welcomeHeader: { height: 94, padding: '0 max(28px, calc((100% - 1240px) / 2))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  signOutBtn: { padding: '9px 18px', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999, background: 'transparent', color: '#fff', fontSize: 12, fontWeight: 600 },
+  welcomeMain: { minHeight: 'calc(100vh - 94px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '30px 20px 70px' },
+  checkCircle: { width: 72, height: 72, display: 'grid', placeItems: 'center', marginBottom: 28, border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, background: '#0b5b69', color: '#fff', fontSize: 36, fontWeight: 700 },
+  welcomeEyebrow: { margin: 0, color: '#d7f3f7', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', fontWeight: 700 },
+  welcomeTitle: { margin: '26px 0 22px', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 'clamp(4rem, 9vw, 12rem)', lineHeight: 0.88, letterSpacing: '-0.06em' },
+  'welcomeTitle span': { display: 'inline-block', padding: '0.02em 0.22em', borderRadius: 14, background: '#0c5f7e', color: '#fff', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12)' },
+  welcomeSubtextNew: { margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 1.9 },
+  welcomeBtnNew: { marginTop: 34, padding: '14px 28px', border: 0, borderRadius: 999, background: '#f5f1ea', color: '#0d4d5d', fontSize: 13, fontWeight: 700 },
+  welcomeFooter: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.45)', fontSize: 9, letterSpacing: '0.35em' },
 }

@@ -56,7 +56,7 @@ def generate_for_student(
     filename = f"{output_type}_{student.roll_no}_bulk.png"
     output_path = os.path.join(GENERATED_DIR, filename)
 
-    photo_path = student.photo_path if student.photo_path and os.path.exists(student.photo_path) else None
+    photo_path = student.photo_path
 
     generate_poster(
         student_name=full_name,

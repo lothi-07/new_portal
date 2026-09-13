@@ -1,8 +1,25 @@
 import { useState, useEffect } from 'react'
-import { API_BASE, getStudent, listEventFlyers, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl } from './api'
+import { API_BASE, getStudent, listEventFlyers, getMyRegistrations, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl } from './api'
+import StudentDashboardTab from './tabs/StudentDashboardTab'
+import CertificateViewer from './components/CertificateViewer'
+import StudentLeaderboardTab from './tabs/StudentLeaderboardTab'
 
 const EVENT_TYPES = ['Technical', 'Non-Technical', 'Sports', 'Cultural', 'Other']
 const PRIZE_TYPES = ['1st Prize', '2nd Prize', '3rd Prize', 'Participation']
+
+const SIDEBAR_ITEMS = [
+  { id: 'dashboard', icon: '▦', label: 'DASHBOARD' },
+  { id: 'participation', icon: '♕', label: 'MY ACHIEVEMENTS' },
+  { id: 'certificates', icon: '▤', label: 'CERTIFICATES' },
+]
+
+const TOP_LINES = [
+  "Every certificate is one step closer to legendary 🏆",
+  "Small wins today, big trophies tomorrow 🚀",
+  "You're closer to #1 than you think 😉",
+  "Keep going — your future self is already proud 🌟",
+  "Achievements loading... don't stop now!",
+]
 
 export default function StudentView({ session, onLogout }) {
   const [profile, setProfile] = useState(() => {
@@ -18,6 +35,8 @@ export default function StudentView({ session, onLogout }) {
     }
   })
   const [flyers, setFlyers] = useState([])
+  const [registrations, setRegistrations] = useState([])
+  const [selectedRegistrationId, setSelectedRegistrationId] = useState('')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [voucherUploaded, setVoucherUploaded] = useState(false)
   const [showAddAchievement, setShowAddAchievement] = useState(false)
@@ -31,9 +50,31 @@ export default function StudentView({ session, onLogout }) {
     prize_type: 'Participation',
     event_date: '',
     organizer: '',
+    college_name: '',
   })
   const [certificateFile, setCertificateFile] = useState(null)
-  const [activeTab, setActiveTab] = useState('details')
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [copiedCertId, setCopiedCertId] = useState(null)
+  const [topLine] = useState(() => TOP_LINES[Math.floor(Math.random() * TOP_LINES.length)])
+
+  const certUrl = (path) => (path?.startsWith('http') ? path : `${API_BASE}${path}`)
+
+  const shareCertToLinkedIn = (cert) => {
+    const url = certUrl(cert.certificate_upload_path)
+    const shareLink = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
+    window.open(shareLink, '_blank', 'noopener,noreferrer')
+  }
+
+  const copyPortfolioUrl = async (cert) => {
+    const url = certUrl(cert.certificate_upload_path)
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedCertId(cert.id)
+      setTimeout(() => setCopiedCertId(null), 1800)
+    } catch (error) {
+      alert('Could not copy the link. Long-press or right-click the certificate to copy its URL instead.')
+    }
+  }
 
   const studentId = session?.student_id ?? session?.id
 
@@ -42,7 +83,7 @@ export default function StudentView({ session, onLogout }) {
 
     try {
       const studentRes = studentId ? await getStudent(studentId) : { data: { ...profile, first_name: session?.name?.split(' ')[0] || session?.first_name || 'Student' } }
-      const flyersRes = await listEventFlyers()
+      const [flyersRes, registrationsRes] = await Promise.all([listEventFlyers(), getMyRegistrations()])
 
       const studentData = studentRes?.data || {}
       const mergedProfile = {
@@ -60,6 +101,7 @@ export default function StudentView({ session, onLogout }) {
 
       setProfile(mergedProfile)
       setFlyers(Array.isArray(flyersRes?.data) ? flyersRes.data : [])
+      setRegistrations(Array.isArray(registrationsRes?.data) ? registrationsRes.data : [])
     } catch (error) {
       console.error('Failed to load student view:', error)
       setProfile({
@@ -72,12 +114,19 @@ export default function StudentView({ session, onLogout }) {
         achievements: [],
       })
       setFlyers([])
+      setRegistrations([])
     }
   }
 
   useEffect(() => {
     loadStudentPage()
   }, [session])
+
+  useEffect(() => {
+    const openCertificates = () => setShowUploadCertificate(true)
+    window.addEventListener('openStudentCertificates', openCertificates)
+    return () => window.removeEventListener('openStudentCertificates', openCertificates)
+  }, [])
 
   const achievements = Array.isArray(profile?.achievements) ? profile.achievements : []
   const displayName = profile.first_name || session?.name || 'Student'
@@ -136,11 +185,14 @@ export default function StudentView({ session, onLogout }) {
       fd.append('prize_type', manualForm.prize_type)
       fd.append('event_date', manualForm.event_date || '')
       fd.append('organizer', manualForm.organizer || '')
+      fd.append('college_name', manualForm.college_name || '')
+      if (selectedRegistrationId) fd.append('registration_id', selectedRegistrationId)
       fd.append('file', certificateFile)
       await uploadCertificate(fd)
       setShowAddAchievement(false)
       setCertificateFile(null)
-      setManualForm({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '' })
+      setSelectedRegistrationId('')
+      setManualForm({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '', college_name: '' })
       await loadStudentPage()
     } catch (error) {
       alert(error.response?.data?.detail || 'Unable to save achievement')
@@ -160,11 +212,14 @@ export default function StudentView({ session, onLogout }) {
       fd.append('prize_type', manualForm.prize_type)
       fd.append('event_date', manualForm.event_date || '')
       fd.append('organizer', manualForm.organizer || '')
+      fd.append('college_name', manualForm.college_name || '')
+      if (selectedRegistrationId) fd.append('registration_id', selectedRegistrationId)
       fd.append('file', certificateFile)
       await uploadCertificate(fd)
       setShowUploadCertificate(false)
       setCertificateFile(null)
-      setManualForm({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '' })
+      setSelectedRegistrationId('')
+      setManualForm({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '', college_name: '' })
       await loadStudentPage()
     } catch (error) {
       alert(error.response?.data?.detail || 'Unable to upload certificate')
@@ -175,88 +230,34 @@ export default function StudentView({ session, onLogout }) {
 
   return (
     <div style={styles.pageShell}>
+      <aside style={styles.studentSidebar}>
+        <div style={styles.studentBrand}><strong>Achievement<br />Portal</strong></div>
+        {SIDEBAR_ITEMS.map(({ id, icon, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            style={{ ...styles.studentNavItem, ...(activeTab === id ? styles.studentNavActive : {}) }}
+          >
+            <span style={styles.studentNavIcon}>{icon}</span><span>{label}</span>
+          </button>
+        ))}
+        <button type="button" onClick={onLogout} style={styles.studentNavItem}><span style={styles.studentNavIcon}>↪</span><span>LOGOUT</span></button>
+      </aside>
       <div style={styles.pageWrap}>
         <header style={styles.topBar}>
-          <div>
-            <div style={styles.kicker}>Achievement Portal</div>
-            <h1 style={styles.heading}>Welcome, {displayName}</h1>
-          </div>
-          <button onClick={onLogout} style={styles.logoutButton}>Logout</button>
+          <div style={styles.topBrand}><span style={styles.topBrandMark}>[A]</span><strong>{topLine}</strong></div>
+          <button  style={styles.topActions} ><span style={styles.topAvatar}>{displayName.charAt(0).toUpperCase()}</span><strong>{displayName}</strong></button>
         </header>
 
-        <section style={styles.profileHeader}>
-          <div style={styles.profileCardLarge}>
-            <div style={styles.avatarWrap}>
-              <img src={profilePhotoUrl} alt="Student profile" style={styles.avatar} onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextSibling.style.display = 'flex'; }} />
-              <div style={{ ...styles.avatarFallback, display: profile.photo_path ? 'none' : 'flex' }}>{profileInitials}</div>
-            </div>
-
-            <div style={styles.profileInfo}>
-              <h2 style={styles.profileName}>{displayName}</h2>
-              <p style={styles.profileRole}>Student</p>
-              <div style={styles.profileMeta}>
-                <span>📌 {profile.roll_no}</span>
-                <span>🎓 {profile.year}</span>
-                <span>🏢 {profile.department}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section style={styles.dashboardTabs}>
-          <div style={styles.tabsNav}>
-            {[
-              { id: 'details', label: 'Student Details' },
-              { id: 'participation', label: 'Participation' },
-              { id: 'certificates', label: 'Certificates' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{ ...styles.tabBtn, ...(activeTab === tab.id ? styles.tabBtnActive : {}) }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'details' && (
+          {activeTab === 'dashboard' && (
             <div style={styles.tabContent}>
-              <div style={styles.detailsGrid}>
-                <div style={styles.detailCard}>
-                  <label>Roll Number</label>
-                  <p>{profile.roll_no}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Registration Number</label>
-                  <p>{profile.reg_no}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Year</label>
-                  <p>{profile.year}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Section</label>
-                  <p>{profile.section}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Department</label>
-                  <p>{profile.department}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Email</label>
-                  <p>{profile.email}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Mobile</label>
-                  <p>{profile.mobile_number}</p>
-                </div>
-                <div style={styles.detailCard}>
-                  <label>Total Achievements</label>
-                  <p style={styles.statBig}>{achievements.length}</p>
-                </div>
-              </div>
+              <StudentDashboardTab studentId={studentId} profile={profile} flyers={flyers} onNavigateTab={setActiveTab} />
             </div>
+          )}
+          {activeTab === 'leaderboard' && (
+            <div style={styles.tabContent}><StudentLeaderboardTab studentId={studentId} /></div>
           )}
 
           {activeTab === 'participation' && (
@@ -297,7 +298,13 @@ export default function StudentView({ session, onLogout }) {
                       <div style={styles.achievementActions}>
                         {a.certificate_upload_path && (
                           <button 
-                            onClick={() => setSelectedCertificate(`${API_BASE}${a.certificate_upload_path}`)}
+                            onClick={() => setSelectedCertificate({
+                              url: `${API_BASE}${a.certificate_upload_path}`,
+                              eventName: a.event_name,
+                              eventType: a.event_type,
+                              prize: a.prize_type,
+                              eventDate: a.event_date
+                            })}
                             style={styles.viewBtn}
                           >
                             View Certificate
@@ -314,22 +321,37 @@ export default function StudentView({ session, onLogout }) {
 
           {activeTab === 'certificates' && (
             <div style={styles.tabContent}>
-              <button
-                onClick={() => setShowUploadCertificate(true)}
-                style={styles.primaryBtn}
-              >
-                Upload Certificate
-              </button>
+              <div style={styles.certPageHeader}>
+                <h2 style={styles.certPageTitle}>My Verified Certificate Gallery</h2>
+              </div>
 
               {achievements.filter(a => a.certificate_upload_path).length === 0 ? (
                 <div style={styles.emptyState}>No certificates uploaded yet.</div>
               ) : (
                 <div style={styles.certificateGrid}>
                   {achievements.filter(a => a.certificate_upload_path).map(a => (
-                    <div key={a.id} style={styles.certCard} onClick={() => setSelectedCertificate(`${API_BASE}${a.certificate_upload_path}`)}>
-                      <div style={styles.certThumbnail}>📜</div>
-                      <p style={styles.certName}>{a.event_name}</p>
-                      <p style={styles.certDate}>{a.event_date}</p>
+                    <div key={a.id} style={styles.certCard}>
+                      <img
+                        src={certUrl(a.certificate_upload_path)}
+                        alt={a.event_name}
+                        style={styles.certImage}
+                        onClick={() => setSelectedCertificate({
+                          url: certUrl(a.certificate_upload_path),
+                          eventName: a.event_name,
+                          eventType: a.event_type,
+                          prize: a.prize_type,
+                          eventDate: a.event_date
+                        })}
+                      />
+                      <div style={styles.certCardBody}>
+                        <p style={styles.certName}>{a.event_name}</p>
+                        <small style={styles.certVerified}>✓ Verified</small>
+                        <a href={certUrl(a.certificate_upload_path)} target="_blank" rel="noreferrer" download style={styles.certActionBtn}>Download PDF</a>
+                        <button type="button" style={styles.certActionBtn} onClick={() => shareCertToLinkedIn(a)}>Share to LinkedIn</button>
+                        <button type="button" style={styles.certActionBtn} onClick={() => copyPortfolioUrl(a)}>
+                          {copiedCertId === a.id ? 'Link copied!' : 'Generate Portfolio URL'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -340,22 +362,22 @@ export default function StudentView({ session, onLogout }) {
       </div>
 
       {selectedCertificate && (
-        <div style={styles.modalBackdrop} onClick={() => setSelectedCertificate(null)}>
-          <div style={styles.certificateModal} onClick={e => e.stopPropagation()}>
-            <button style={styles.closeBtn} onClick={() => setSelectedCertificate(null)}>✕</button>
-            {selectedCertificate.endsWith('.pdf') ? (
-              <iframe src={selectedCertificate} style={styles.pdfViewer}></iframe>
-            ) : (
-              <img src={selectedCertificate} alt="Certificate" style={styles.certificateImage} />
-            )}
-          </div>
-        </div>
+        <CertificateViewer
+          certificateUrl={selectedCertificate.url}
+          studentName={profile.first_name}
+          eventName={selectedCertificate.eventName}
+          eventType={selectedCertificate.eventType}
+          prize={selectedCertificate.prize}
+          eventDate={selectedCertificate.eventDate}
+          onClose={() => setSelectedCertificate(null)}
+        />
       )}
 
       {showAddAchievement && (
         <div style={styles.modalBackdrop} onClick={() => setShowAddAchievement(false)}>
           <div style={styles.formModal} onClick={e => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>Add Achievement</h3>
+            <select style={styles.formInput} value={selectedRegistrationId} onChange={e => { setSelectedRegistrationId(e.target.value); const item = registrations.find(r => String(r.id) === e.target.value); if (item) setManualForm({ ...manualForm, event_name: item.event_title, event_date: item.event_end_date || item.event_date || '' }) }}><option value="">Link to a registered event (optional)</option>{registrations.map(item => <option key={item.id} value={item.id}>{item.event_title} - {item.verification_status}</option>)}</select>
             <input style={styles.formInput} placeholder="Event name" value={manualForm.event_name} onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })} />
             <select style={styles.formInput} value={manualForm.event_type} onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}>
               {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -365,6 +387,7 @@ export default function StudentView({ session, onLogout }) {
             </select>
             <input style={styles.formInput} type="date" value={manualForm.event_date} onChange={e => setManualForm({ ...manualForm, event_date: e.target.value })} />
             <input style={styles.formInput} placeholder="Organizer" value={manualForm.organizer} onChange={e => setManualForm({ ...manualForm, organizer: e.target.value })} />
+            <input style={styles.formInput} placeholder="Participating college" value={manualForm.college_name} onChange={e => setManualForm({ ...manualForm, college_name: e.target.value })} />
             <input style={styles.formInput} type="file" accept="image/*,.pdf" onChange={e => setCertificateFile(e.target.files?.[0] || null)} />
             <div style={styles.formActions}>
               <button style={styles.primaryBtn} onClick={submitManualAchievement} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -378,6 +401,7 @@ export default function StudentView({ session, onLogout }) {
         <div style={styles.modalBackdrop} onClick={() => setShowUploadCertificate(false)}>
           <div style={styles.formModal} onClick={e => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>Upload Certificate</h3>
+            <select style={styles.formInput} value={selectedRegistrationId} onChange={e => { setSelectedRegistrationId(e.target.value); const item = registrations.find(r => String(r.id) === e.target.value); if (item) setManualForm({ ...manualForm, event_name: item.event_title, event_date: item.event_end_date || item.event_date || '' }) }}><option value="">Link to a registered event (optional)</option>{registrations.map(item => <option key={item.id} value={item.id}>{item.event_title} - {item.verification_status}</option>)}</select>
             <input style={styles.formInput} placeholder="Event name" value={manualForm.event_name} onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })} />
             <select style={styles.formInput} value={manualForm.event_type} onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}>
               {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -387,6 +411,7 @@ export default function StudentView({ session, onLogout }) {
             </select>
             <input style={styles.formInput} type="date" value={manualForm.event_date} onChange={e => setManualForm({ ...manualForm, event_date: e.target.value })} />
             <input style={styles.formInput} placeholder="Organizer" value={manualForm.organizer} onChange={e => setManualForm({ ...manualForm, organizer: e.target.value })} />
+            <input style={styles.formInput} placeholder="Participating college" value={manualForm.college_name} onChange={e => setManualForm({ ...manualForm, college_name: e.target.value })} />
             <input style={styles.formInput} type="file" accept="image/*" onChange={e => setCertificateFile(e.target.files?.[0] || null)} />
             <div style={styles.formActions}>
               <button style={styles.primaryBtn} onClick={submitCertificate} disabled={saving}>{saving ? 'Uploading...' : 'Upload'}</button>
@@ -399,185 +424,57 @@ export default function StudentView({ session, onLogout }) {
   )
 }
 
+function SettingsField({ label, value }) {
+  return (
+    <div style={styles.settingsField}>
+      <span style={styles.settingsFieldLabel}>{label}</span>
+      <strong style={styles.settingsFieldValue}>{value}</strong>
+    </div>
+  )
+}
+
 const styles = {
   pageShell: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f3efe7 0%, #e7e2da 38%, #f9f7f4 100%)',
-    padding: '36px 20px 60px',
+    display: 'flex',
+    background: '#edf4fb',
     fontFamily: "'Inter', 'Poppins', sans-serif",
     color: '#161b2d',
   },
+  studentSidebar: { width: 84, minWidth: 84, minHeight: '100vh', background: '#071126', color: '#c9d3e8', display: 'flex', flexDirection: 'column', alignItems: 'stretch', padding: '12px 0', gap: 4 },
+  studentBrand: { height: 54, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#fff', fontSize: 9, lineHeight: 1.1, textAlign: 'left', marginBottom: 14 },
+  studentBrandMark: { color: '#5453e8', fontSize: 20, fontWeight: 900 },
+  studentNavItem: { minHeight: 62, border: 0, borderLeft: '3px solid transparent', background: 'transparent', color: '#c1cade', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 8, letterSpacing: '.04em', cursor: 'pointer' },
+  studentNavActive: { borderLeftColor: '#4b50ee', background: 'rgba(67,76,210,.22)', color: '#fff' },
+  studentNavIcon: { fontSize: 19, lineHeight: 1, color: '#d8e2f3' },
   pageWrap: {
-    maxWidth: 1220,
-    margin: '0 auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 20,
-  },
-  topBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  kicker: {
-    fontSize: 12,
-    letterSpacing: '0.18em',
-    textTransform: 'uppercase',
-    fontWeight: 800,
-    color: '#5b647d',
-  },
-  heading: {
-    margin: '10px 0 0',
-    fontSize: 'clamp(2rem, 3vw, 3rem)',
-    fontWeight: 800,
-    letterSpacing: '-0.06em',
-    color: '#171c2d',
-  },
-  logoutButton: {
-    padding: '12px 22px',
-    border: 'none',
-    borderRadius: 12,
-    background: 'linear-gradient(135deg, #9c2344, #6d1f4d)',
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 700,
-    boxShadow: '0 14px 28px rgba(109,31,77,0.18)',
-  },
-  summaryGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1.2fr 1fr',
-    gap: 20,
-  },
-  profileCard: {
-    background: 'linear-gradient(135deg, rgba(26,36,105,0.99), rgba(39,53,124,0.92))',
-    borderRadius: 24,
-    padding: 24,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 18,
-    color: '#fff',
-    boxShadow: '0 16px 36px rgba(26,36,105,0.18)',
-  },
-  avatarWrap: {
-    position: 'relative',
-    width: 92,
-    height: 92,
-    flexShrink: 0,
-    borderRadius: '50%',
-    border: '2px solid rgba(255,255,255,0.4)',
-    overflow: 'hidden',
-    background: 'rgba(255,255,255,0.12)',
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    display: 'block',
-  },
-  avatarFallback: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 26,
-    fontWeight: 800,
-    background: 'linear-gradient(135deg, #d4b14e, #f0d88b)',
-    color: '#1a2469',
-  },
-  profileText: {
     flex: 1,
     minWidth: 0,
-  },
-  badge: {
-    display: 'inline-block',
-    background: 'rgba(255,255,255,0.12)',
-    border: '1px solid rgba(255,255,255,0.22)',
-    borderRadius: 999,
-    padding: '7px 12px',
-    fontSize: 11,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-    fontWeight: 700,
-  },
-  profileName: {
-    margin: '12px 0 10px',
-    fontSize: 28,
-    fontWeight: 800,
-    letterSpacing: '-0.04em',
-  },
-  metaRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 10,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: 600,
-    fontSize: 14,
-  },
-  contactInfo: {
-    marginTop: 10,
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    wordBreak: 'break-word',
-  },
-  statGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: 16,
-  },
-  statCard: {
-    background: '#fff',
-    borderRadius: 18,
-    padding: '18px 16px',
-    border: '1px solid rgba(26,36,105,0.08)',
-    boxShadow: '0 12px 22px rgba(24, 38, 74, 0.06)',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 0,
   },
-  statLabel: {
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: '#697490',
-    fontWeight: 700,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 800,
-    color: '#171c2d',
-    lineHeight: 1.3,
-  },
-  panel: {
-    background: '#fffdfb',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 24,
-    padding: '24px 24px 18px',
-    boxShadow: '0 18px 36px rgba(22, 24, 31, 0.05)',
-  },
-  panelHeader: {
+  topBar: {
+    height: 54,
+    padding: '0 24px',
+    background: '#fff',
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 16,
-    flexWrap: 'wrap',
-    marginBottom: 16,
+    borderBottom: '1px solid #dce5ef',
   },
-  sectionEyebrow: {
-    margin: 0,
-    fontSize: 11,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: '#7d859d',
-    fontWeight: 800,
+  topBrand: { display: 'flex', alignItems: 'center', gap: 7, color: '#202331', fontSize: 15, flex: 1, minWidth: 0 },
+  topBrandMark: { color: '#4d50c9', fontSize: 20, fontWeight: 900, flexShrink: 0 },
+  topActions: { display: 'flex', alignItems: 'center', gap: 9, color: '#5b6576', fontSize: 12, border: 0, background: 'transparent', cursor: 'pointer' },
+  topAvatar: { width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', background: '#759d65', color: '#fff', fontWeight: 800 },
+  dashboardTabs: {
+    flex: 1,
+    background: '#edf4fb',
+    overflow: 'hidden',
   },
-  sectionTitle: {
-    margin: '8px 0 0',
-    fontSize: 30,
-    fontWeight: 800,
-    letterSpacing: '-0.04em',
-    color: '#171c2d',
+  tabContent: {
+    padding: 22,
   },
   actionRow: {
     display: 'flex',
@@ -585,58 +482,55 @@ const styles = {
     flexWrap: 'wrap',
     gap: 10,
   },
-  secondaryButton: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '11px 18px',
-    borderRadius: 10,
-    background: '#edf1ff',
-    color: '#1a2469',
-    fontWeight: 700,
-    fontSize: 14,
-    border: '1px solid rgba(26,36,105,0.12)',
-    cursor: 'pointer',
-  },
-  noticeBox: {
-    borderRadius: 12,
+  warningBox: {
+    borderRadius: 14,
     background: '#fff3d2',
     border: '1px solid #f0d889',
     color: '#7c5a00',
-    padding: '12px 14px',
+    padding: '14px 16px',
     fontSize: 14,
     fontWeight: 600,
-    marginBottom: 18,
+    marginBottom: 20,
+  },
+  emptyState: {
+    background: '#f5f6fb',
+    border: '1px dashed rgba(26,36,105,0.18)',
+    borderRadius: 16,
+    padding: '22px 18px',
+    color: '#48506d',
+    fontWeight: 600,
+    textAlign: 'center',
   },
   achievementList: {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
   },
-  achievementRow: {
-    display: 'grid',
-    gridTemplateColumns: 'auto 1fr auto',
-    gap: 16,
-    alignItems: 'center',
+  achievementCard: {
     background: '#f8f9ff',
     border: '1px solid rgba(26,36,105,0.08)',
     borderRadius: 16,
-    padding: '14px 16px',
+    padding: 16,
+    display: 'flex',
+    gap: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  awardPill: {
+  awardBadge: {
     background: 'linear-gradient(135deg, #f7e7b1, #d7ad34)',
     color: '#2a2104',
     fontWeight: 800,
-    fontSize: 11,
-    padding: '8px 10px',
+    fontSize: 12,
+    padding: '10px 12px',
     borderRadius: 999,
     letterSpacing: '0.04em',
     textTransform: 'uppercase',
-    minWidth: 90,
+    minWidth: 110,
     textAlign: 'center',
+    flexShrink: 0,
   },
-  achievementMain: {
-    minWidth: 0,
+  achievementInfo: {
+    flex: 1,
   },
   achievementTitle: {
     fontSize: 18,
@@ -659,20 +553,17 @@ const styles = {
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
   },
-  linkButton: {
-    color: '#1a2469',
+  viewBtn: {
+    padding: '8px 14px',
+    borderRadius: 10,
+    border: '1px solid #215b70',
+    background: '#215b70',
+    color: '#fff',
     fontWeight: 700,
-    textDecoration: 'none',
-    fontSize: 13,
-  },
-  mutedTag: {
-    color: '#7d5a00',
-    fontWeight: 800,
     fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    cursor: 'pointer',
   },
-  deleteButton: {
+  deleteBtn: {
     padding: '9px 12px',
     borderRadius: 10,
     border: '1px solid rgba(217, 74, 74, 0.35)',
@@ -682,171 +573,69 @@ const styles = {
     fontSize: 13,
     cursor: 'pointer',
   },
-  emptyState: {
-    background: '#f5f6fb',
-    border: '1px dashed rgba(26,36,105,0.18)',
-    borderRadius: 16,
-    padding: '22px 18px',
-    color: '#48506d',
-    fontWeight: 600,
-    textAlign: 'center',
-  },
-  flyerSection: {
-    background: '#fffdfb',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 24,
-    padding: '24px',
-    boxShadow: '0 18px 36px rgba(22, 24, 31, 0.05)',
-  },
-  sectionHeadingRow: {
+  certPageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 18,
   },
-  flyerGrid: {
+  certPageTitle: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 800,
+    color: '#171c2d',
+  },
+  certificateGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     gap: 18,
   },
-  flyerCard: {
+  certCard: {
     background: '#fff',
-    borderRadius: 18,
+    border: '1px solid rgba(26,36,105,0.1)',
+    borderRadius: 14,
     overflow: 'hidden',
-    border: '1px solid rgba(26,36,105,0.08)',
-    boxShadow: '0 12px 26px rgba(20, 24, 35, 0.04)',
+    boxShadow: '0 8px 20px rgba(20,36,60,0.05)',
   },
-  flyerImage: {
+  certImage: {
     width: '100%',
-    height: 210,
+    height: 140,
     objectFit: 'cover',
     display: 'block',
-    background: '#f3f5fb',
+    background: '#eceffa',
+    cursor: 'pointer',
   },
-  pdfCard: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 210,
-    textDecoration: 'none',
-    color: '#1a2469',
-    background: 'linear-gradient(135deg, #f4f5fb, #eef2ff)',
-    fontWeight: 800,
-    fontSize: 17,
+  certCardBody: {
+    padding: 14,
+    display: 'grid',
+    gap: 8,
   },
-  flyerBody: {
-    padding: 16,
-  },
-  flyerTitle: {
-    margin: '0 0 8px',
-    fontSize: 20,
-    color: '#171c2d',
-    fontWeight: 800,
-  },
-  flyerDescription: {
-    margin: '0 0 8px',
-    color: '#58637a',
-    fontSize: 14,
-    lineHeight: 1.5,
-  },
-  flyerMeta: {
-    margin: '5px 0',
-    fontSize: 13,
-    color: '#4d5b76',
-  },
-  flyerDeadline: {
-    margin: '8px 0 0',
-    fontSize: 13,
-    color: '#9a6a00',
-    fontWeight: 800,
-  },
-  profileHeader: {
-    marginBottom: 24,
-  },
-  profileCardLarge: {
-    background: 'linear-gradient(135deg, #1a2469 0%, #2e4593 100%)',
-    borderRadius: 24,
-    padding: 28,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 24,
-    color: '#fff',
-    boxShadow: '0 20px 40px rgba(26,36,105,0.2)',
-    border: '1px solid rgba(255,255,255,0.1)',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileRole: {
-    margin: '0 0 12px',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: 600,
-  },
-  profileMeta: {
-    display: 'flex',
-    gap: 16,
-    fontSize: 15,
-    fontWeight: 600,
-  },
-  dashboardTabs: {
-    background: '#fffdfb',
-    borderRadius: 24,
-    border: '1px solid rgba(26,36,105,0.08)',
-    overflow: 'hidden',
-    boxShadow: '0 18px 36px rgba(22, 24, 31, 0.05)',
-  },
-  tabsNav: {
-    display: 'flex',
-    borderBottom: '2px solid rgba(26,36,105,0.1)',
-  },
-  tabBtn: {
-    flex: 1,
-    padding: '18px 16px',
-    border: 'none',
-    background: 'transparent',
-    color: '#697490',
+  certName: {
+    margin: 0,
     fontSize: 15,
     fontWeight: 700,
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    borderBottom: '3px solid transparent',
-    textAlign: 'center',
-  },
-  tabBtnActive: {
-    color: '#1a2469',
-    borderBottomColor: '#f6c55a',
-    background: 'rgba(246, 197, 90, 0.08)',
-  },
-  tabContent: {
-    padding: 24,
-  },
-  detailsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 16,
-  },
-  detailCard: {
-    background: '#f8f9ff',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 16,
-    padding: 16,
-  },
-  detailCardLabel: {
-    display: 'block',
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: '#697490',
-    fontWeight: 800,
-    marginBottom: 8,
-  },
-  detailCardValue: {
-    fontSize: 18,
-    fontWeight: 800,
     color: '#171c2d',
   },
-  statBig: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: '#f6c55a',
+  certVerified: {
+    color: '#2d9a72',
+    fontWeight: 700,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  certActionBtn: {
+    display: 'block',
+    textAlign: 'center',
+    padding: '9px 10px',
+    border: '1px solid #dce4ed',
+    borderRadius: 8,
+    background: '#fff',
+    color: '#3f49a7',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer',
+    textDecoration: 'none',
   },
   uploadBtn: {
     display: 'inline-flex',
@@ -878,86 +667,10 @@ const styles = {
     borderRadius: 12,
     border: '2px solid #dbe2f2',
     background: '#fff',
-    color: '#1a2469',
+    color: '#215b70',
     fontWeight: 800,
     fontSize: 14,
     cursor: 'pointer',
-  },
-  warningBox: {
-    borderRadius: 14,
-    background: '#fff3d2',
-    border: '1px solid #f0d889',
-    color: '#7c5a00',
-    padding: '14px 16px',
-    fontSize: 14,
-    fontWeight: 600,
-    marginBottom: 20,
-  },
-  achievementCard: {
-    background: '#f8f9ff',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 16,
-    padding: 16,
-    display: 'flex',
-    gap: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  awardBadge: {
-    background: 'linear-gradient(135deg, #f7e7b1, #d7ad34)',
-    color: '#2a2104',
-    fontWeight: 800,
-    fontSize: 12,
-    padding: '10px 12px',
-    borderRadius: 999,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    minWidth: 110,
-    textAlign: 'center',
-    flexShrink: 0,
-  },
-  achievementInfo: {
-    flex: 1,
-  },
-  viewBtn: {
-    padding: '8px 14px',
-    borderRadius: 10,
-    border: '1px solid #1a2469',
-    background: '#1a2469',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 12,
-    cursor: 'pointer',
-  },
-  certificateGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-    gap: 16,
-    marginTop: 20,
-  },
-  certCard: {
-    background: '#f8f9ff',
-    border: '2px solid rgba(26,36,105,0.12)',
-    borderRadius: 16,
-    padding: 16,
-    textAlign: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-  },
-  certThumbnail: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  certName: {
-    margin: '0 0 4px',
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#171c2d',
-  },
-  certDate: {
-    margin: 0,
-    fontSize: 12,
-    color: '#697490',
   },
   modalBackdrop: {
     position: 'fixed',
@@ -968,42 +681,6 @@ const styles = {
     justifyContent: 'center',
     zIndex: 100,
     padding: 20,
-  },
-  certificateModal: {
-    width: '100%',
-    maxWidth: 800,
-    height: '80vh',
-    background: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    boxShadow: '0 30px 60px rgba(0,0,0,0.3)',
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 40,
-    height: 40,
-    border: 'none',
-    background: 'rgba(0,0,0,0.08)',
-    borderRadius: '50%',
-    fontSize: 24,
-    cursor: 'pointer',
-    zIndex: 101,
-  },
-  pdfViewer: {
-    width: '100%',
-    height: '100%',
-    border: 'none',
-  },
-  certificateImage: {
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain',
   },
   formModal: {
     width: '100%',
@@ -1035,40 +712,77 @@ const styles = {
     gap: 12,
     marginTop: 20,
   },
-}
-
-const modalStyles = {
-  backdrop: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.42)',
+  settingsCard: {
+    background: '#fff',
+    border: '1px solid rgba(26,36,105,0.08)',
+    borderRadius: 18,
+    padding: 24,
+    maxWidth: 560,
+  },
+  settingsHeader: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
-    padding: 20,
+    gap: 16,
+    marginBottom: 18,
   },
-  modal: {
-    width: '100%',
-    maxWidth: 420,
-    background: '#fff',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: '0 26px 60px rgba(0,0,0,0.15)',
+  settingsAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: '50%',
+    objectFit: 'cover',
+    border: '2px solid #dce4ed',
   },
-  title: {
-    margin: '0 0 14px',
-    fontSize: 24,
-    color: '#1d1d1d',
+  settingsName: {
+    margin: 0,
+    fontSize: 19,
+    color: '#171c2d',
   },
-  input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '10px 12px',
+  settingsSub: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    color: '#697490',
+  },
+  settingsUploadBtn: {
+    display: 'inline-block',
+    padding: '9px 16px',
     borderRadius: 8,
-    border: '1px solid #d8d8d8',
+    border: '1px solid #dce4ed',
+    background: '#f8f9ff',
+    color: '#3f49a7',
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
+    marginBottom: 20,
+  },
+  settingsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0,1fr))',
+    gap: 14,
+    marginBottom: 22,
+  },
+  settingsField: {
+    display: 'grid',
+    gap: 4,
+  },
+  settingsFieldLabel: {
+    fontSize: 11,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#8891a8',
+    fontWeight: 700,
+  },
+  settingsFieldValue: {
     fontSize: 14,
-    marginBottom: 10,
-    outline: 'none',
+    color: '#171c2d',
+  },
+  settingsLogout: {
+    padding: '10px 18px',
+    borderRadius: 10,
+    border: '1px solid rgba(217, 74, 74, 0.35)',
+    background: '#fff',
+    color: '#d94a4a',
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
   },
 }

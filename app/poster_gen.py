@@ -1,5 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+import io
 import os, math, random
+from urllib.request import urlopen
 
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
@@ -118,6 +120,21 @@ def fill_rect(draw, box, color):
     draw.rectangle((sc(x0), sc(y0), sc(x1), sc(y1)), fill=color)
 
 
+def load_photo(photo_path):
+    """Load a local or Supabase-hosted student photo for certificate rendering."""
+    if not photo_path:
+        return None
+
+    if photo_path.startswith(("http://", "https://")):
+        with urlopen(photo_path, timeout=15) as response:
+            return Image.open(io.BytesIO(response.read()))
+
+    if os.path.exists(photo_path):
+        return Image.open(photo_path)
+
+    return None
+
+
 def cover_with_template_background(img, box):
  
     x0, y0, x1, y1 = box
@@ -162,9 +179,10 @@ def generate_poster(student_name, event_name, prize_type, photo_path=None, outpu
     # make the photo slightly smaller than the inner radius to avoid touching the decorative ring
     photo_px = sc((PHOTO_R - 2) * 2)
     
-    if photo_path and os.path.exists(photo_path):
+    photo = load_photo(photo_path)
+    if photo is not None:
         # Crop and resize photo to circular frame
-        photo = circle_crop(Image.open(photo_path), (photo_px, photo_px))
+        photo = circle_crop(photo, (photo_px, photo_px))
 
         # Position photo in the circle (scaled coords). Use a slightly reduced radius
         photo_x = sc(PHOTO_CX - (PHOTO_R - 2))

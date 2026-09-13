@@ -9,11 +9,13 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/signup", response_model=schemas.TokenOut)
-def signup(payload: schemas.AdminSignup, db: Session = Depends(get_db)):
+def signup(payload: schemas.StaffCreate, db: Session = Depends(get_db)):
+    """Create a staff account; administrator accounts are provisioned separately."""
     existing = db.query(models.AdminUser).filter(models.AdminUser.email == payload.email).first()
+    existing = existing or db.query(models.StaffUser).filter(models.StaffUser.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
-    user = models.AdminUser(
+    user = models.StaffUser(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         name=payload.name,
@@ -21,8 +23,8 @@ def signup(payload: schemas.AdminSignup, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    token = create_access_token({"email": user.email, "type": "local", "role": "admin"})
-    return {"access_token": token, "email": user.email, "name": user.name, "role": "admin"}
+    token = create_access_token({"email": user.email, "type": "local", "role": "staff"})
+    return {"access_token": token, "email": user.email, "name": user.name, "role": "staff"}
 
 
 @router.post("/login", response_model=schemas.TokenOut)
@@ -52,8 +54,15 @@ def google_login(body: dict, db: Session = Depends(get_db)):
     info = verify_google_token(credential)
     email = info.get("email")
     name = info.get("name")
-    # We just pass the Google token straight back — get_current_admin() can verify it directly too.
-    return {"access_token": credential, "email": email, "name": name, "role": "admin"}
+    user = db.query(models.AdminUser).filter(models.AdminUser.email == email, models.AdminUser.is_active.is_(True)).first()
+    role = "admin"
+    if not user:
+        user = db.query(models.StaffUser).filter(models.StaffUser.email == email, models.StaffUser.is_active.is_(True)).first()
+        role = "staff"
+    if not user:
+        raise HTTPException(status_code=403, detail="Create a staff account before using Google sign-in")
+    token = create_access_token({"email": email, "type": "google", "role": role})
+    return {"access_token": token, "email": email, "name": user.name or name, "role": role}
 
 @router.post("/student-login")
 def student_login(body: dict, db: Session = Depends(get_db)):
@@ -104,3 +113,19 @@ def create_staff_account(
     # The created staff account must sign in separately; this token is not used by the admin UI.
     token = create_access_token({"email": user.email, "type": "local", "role": "staff"})
     return {"access_token": token, "email": user.email, "name": user.name, "role": "staff"}
+
+
+@router.get("/staff")
+def list_staff_accounts(
+    db: Session = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+):
+    return [
+        {
+            "id": user.id,
+            "name": user.name or "Unnamed staff",
+            "email": user.email,
+            "is_active": user.is_active,
+        }
+        for user in db.query(models.StaffUser).order_by(models.StaffUser.name, models.StaffUser.email).all()
+    ]

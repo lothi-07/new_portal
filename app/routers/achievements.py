@@ -1,5 +1,6 @@
 import os, io
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
@@ -7,6 +8,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..auth import get_current_admin, get_current_student_or_admin
 from ..poster_gen import generate_poster
+from ..routers.gamification import update_student_stats
 
 router = APIRouter(prefix="/achievements", tags=["Achievements"])
 
@@ -47,6 +49,10 @@ def create_achievement(
     db.add(db_achievement)
     db.commit()
     db.refresh(db_achievement)
+    
+    # Update gamification stats
+    update_student_stats(achievement.student_id, db)
+    
     return db_achievement
 
 
@@ -58,6 +64,8 @@ def upload_certificate(
     prize_type: str = Form("Participation"),
     event_date: str = Form(""),
     organizer: str = Form(""),
+    college_name: str = Form(""),
+    registration_id: Optional[int] = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_student_or_admin),
@@ -72,6 +80,16 @@ def upload_certificate(
         raise HTTPException(status_code=404, detail="Student not found")
     if current_user.get("role") == "student" and current_user.get("student_id") != student_id:
         raise HTTPException(status_code=403, detail="You can upload certificates only for your own profile")
+    registration = None
+    if registration_id:
+        registration = db.query(models.EventRegistration).filter(
+            models.EventRegistration.id == registration_id,
+            models.EventRegistration.student_id == student_id,
+        ).first()
+        if not registration:
+            raise HTTPException(status_code=404, detail="Event registration not found")
+        if registration.verification_status != "approved":
+            raise HTTPException(status_code=400, detail="The event registration must be approved before uploading a certificate")
 
     os.makedirs(UPLOADS_DIR, exist_ok=True)
     ext = os.path.splitext(file.filename)[1] or ".jpg"
@@ -88,12 +106,21 @@ def upload_certificate(
         prize_type=prize_type,
         event_date=event_date or None,
         organizer=organizer or None,
+        college_name=college_name or None,
         source="certificate_upload",
         certificate_upload_path=public_path,
     )
     db.add(db_achievement)
+    if registration:
+        registration.certificate_upload_path = public_path
+        registration.certificate_uploaded_at = datetime.now(timezone.utc)
+        registration.reminder_sent_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(db_achievement)
+    
+    # Update gamification stats
+    update_student_stats(student_id, db)
+    
     return db_achievement
 
 
@@ -108,8 +135,14 @@ def delete_achievement(
         raise HTTPException(status_code=404, detail="Achievement not found")
     if current_user.get("role") == "student" and current_user.get("student_id") != db_a.student_id:
         raise HTTPException(status_code=403, detail="You can delete only your own achievements")
+    
+    student_id = db_a.student_id
     db.delete(db_a)
     db.commit()
+    
+    # Update gamification stats
+    update_student_stats(student_id, db)
+    
     return {"message": "Achievement deleted"}
 
 
@@ -133,7 +166,7 @@ def generate_output(
     filename = f"{output_type}_{student.roll_no}_{achievement.id}.png"
     output_path = os.path.join(GENERATED_DIR, filename)
 
-    photo_path = student.photo_path if student.photo_path and os.path.exists(student.photo_path) else None
+    photo_path = student.photo_path
 
     generate_poster(
         student_name=full_name,

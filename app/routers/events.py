@@ -34,6 +34,7 @@ def search_events(event_name: Optional[str] = None, event_type: Optional[str] = 
             "event_type": a.event_type,
             "prize_type": a.prize_type,
             "event_date": a.event_date,
+            "college_name": a.college_name,
         }
         for a in results
     ]
@@ -46,7 +47,7 @@ def export_search(event_name: Optional[str] = None, event_type: Optional[str] = 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Event Results"
-    headers = ["S No", "Name", "Roll No", "Event Name", "Event Type", "Prize", "Participation Date"]
+    headers = ["S No", "Name", "Roll No", "Event Name", "Event Type", "Prize", "College", "Participation Date"]
     ws.append(headers)
     for c in ws[1]:
         c.font = Font(bold=True, color="FFFFFF")
@@ -55,7 +56,7 @@ def export_search(event_name: Optional[str] = None, event_type: Optional[str] = 
     for i, a in enumerate(results, start=1):
         ws.append([
             i, f"{a.student.first_name} {a.student.last_name or ''}".strip(), a.student.roll_no,
-            a.event_name, a.event_type or "", a.prize_type or "", a.event_date or "",
+            a.event_name, a.event_type or "", a.prize_type or "", a.college_name or "", a.event_date or "",
         ])
 
     buf = io.BytesIO()

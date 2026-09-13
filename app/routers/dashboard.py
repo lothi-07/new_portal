@@ -9,6 +9,7 @@ from openpyxl.styles import Font, PatternFill
 
 from .. import models
 from ..database import get_db
+from ..auth import get_current_admin, get_current_staff_or_admin
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -21,7 +22,7 @@ def _achievement_counts(db: Session):
 
 
 @router.get("/stats")
-def dashboard_stats(year: Optional[str] = None, section: Optional[str] = None, db: Session = Depends(get_db)):
+def dashboard_stats(year: Optional[str] = None, section: Optional[str] = None, db: Session = Depends(get_db), admin: str = Depends(get_current_admin)):
     query = db.query(models.Student)
     if year:
         query = query.filter(models.Student.year == year)
@@ -59,6 +60,12 @@ def dashboard_stats(year: Optional[str] = None, section: Optional[str] = None, d
         "participants": participants,
         "non_participants": non_participants,
     }
+
+
+@router.get("/top-five")
+def top_five_students(db: Session = Depends(get_db), user: dict = Depends(get_current_staff_or_admin)):
+    data = dashboard_stats(db=db, admin=user["email"])
+    return {"top_performers": data["top_performers"][:5]}
 
 
 def _export_list(items, filename, cols, extractor):
