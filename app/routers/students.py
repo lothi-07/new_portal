@@ -1,4 +1,5 @@
 import io
+import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -254,7 +255,7 @@ def upload_student_photo(
     if current_user.get("role") == "student" and current_user.get("student_id") != student_id:
         raise HTTPException(status_code=403, detail="You can upload only your own photo")
 
-    ext = os.path.splitext(file.filename)[1] or ".jpg"
+    ext = (os.path.splitext(file.filename)[1] or ".jpg").lower()
     file_bytes = file.file.read()
     public_url = upload_photo_bytes(file_bytes, f"{student.roll_no}{ext}")
 

@@ -118,8 +118,11 @@ async def import_students(
                 base = os.path.basename(name)
                 if not base or base.startswith("__MACOSX") or "." not in base:
                     continue
-                roll_key = os.path.splitext(base)[0].strip().strip("'").upper()
-                ext = os.path.splitext(base)[1]
+                roll_key = os.path.splitext(base)[0].strip().strip("'")
+                # Strip Windows-style duplicate-file suffixes, e.g. "ES24AD115 (1)" -> "ES24AD115",
+                # which otherwise created a roll number that matched no real student.
+                roll_key = re.sub(r"\s*\(\d+\)\s*$", "", roll_key).strip().upper()
+                ext = os.path.splitext(base)[1].lower()
                 public_url = upload_photo_bytes(zf.read(name), f"{roll_key}{ext}")
                 photo_map[roll_key] = public_url
 

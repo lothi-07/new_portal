@@ -110,14 +110,9 @@ coverage/
 app/static/photos/
 app/static/uploads/
 app/static/generated/
-app/static/event-flyers/
 static/photos/
 static/uploads/
 static/generated/
-static/event-flyers/
-event_flyers/
 generated/
 uploads/
 photos/
-app/assets/
-app/fonts/

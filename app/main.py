@@ -80,6 +80,24 @@ def ensure_event_workflow_columns():
             "certificate_uploaded_at": "DATETIME",
             "reminder_sent_at": "DATETIME",
         },
+        "students": {
+            "reg_no": "VARCHAR",
+            "last_name": "VARCHAR",
+            "gender": "VARCHAR",
+            "dob": "VARCHAR",
+            "blood_group": "VARCHAR",
+            "mobile_number": "VARCHAR",
+            "email": "VARCHAR",
+            "year": "VARCHAR DEFAULT 'I'",
+            "department": "VARCHAR DEFAULT 'AI & DS'",
+            "section": "VARCHAR",
+            "photo_path": "VARCHAR",
+            "total_points": "INTEGER DEFAULT 0",
+            "total_events": "INTEGER DEFAULT 0",
+            "current_badge": "VARCHAR",
+            # SQLite does not allow CURRENT_TIMESTAMP as an ALTER TABLE default.
+            "updated_at": "DATETIME",
+        },
     }
     if "postgresql" in DATABASE_URL:
         postgres_columns = {

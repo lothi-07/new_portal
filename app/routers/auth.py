@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -70,7 +71,13 @@ def student_login(body: dict, db: Session = Depends(get_db)):
     roll_no = str(body.get("roll_no", "")).strip().upper()
     mobile_input = str(body.get("mobile", "")).strip()
 
-    student = db.query(models.Student).filter(models.Student.roll_no == roll_no).first()
+    try:
+        student = db.query(models.Student).filter(models.Student.roll_no == roll_no).first()
+    except OperationalError:
+        raise HTTPException(
+            status_code=503,
+            detail="Student login is temporarily unavailable because the database cannot be reached",
+        )
     if not student or not student.mobile_number:
         raise HTTPException(status_code=401, detail="Roll number or mobile number is incorrect")
 

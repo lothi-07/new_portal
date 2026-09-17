@@ -72,23 +72,20 @@ def upload_photo_bytes(file_bytes: bytes, filename: str) -> str:
 
 
 def public_photo_url(photo_path: str | None, roll_no: str | None = None) -> str | None:
-    """Convert legacy local photo paths to their Supabase public URL."""
-    if not photo_path and not roll_no:
-        return None
+    """Return the student's photo URL.
+
+    IMPORTANT: if we already have a full Supabase URL stored (set at upload
+    time in students.py / import_data.py), we return it AS-IS. We used to
+    re-guess the filename as "{roll_no}.jpg" here, which silently returned a
+    URL for students who never uploaded a photo at all, and broke photos for
+    anyone whose uploaded file wasn't exactly a lowercase ".jpg" (e.g. a
+    phone photo saved as .JPG or .PNG) — since the guess always assumed
+    lowercase ".jpg" and never fell through to try the others. The stored
+    photo_path is always correct, so there's no need to guess.
+    """
     if not photo_path:
-        client = _get_client()
-        if client is not None:
-            return client.storage.from_(BUCKET_NAME).get_public_url(
-                f"{roll_no.strip().upper()}.jpg"
-            )
         return None
     if photo_path.startswith(("http://", "https://")):
-        if roll_no:
-            client = _get_client()
-            if client is not None:
-                for extension in (".jpg", ".jpeg", ".png", ".webp"):
-                    filename = f"{roll_no.strip().upper()}{extension}"
-                    return client.storage.from_(BUCKET_NAME).get_public_url(filename)
         return photo_path
     if photo_path.startswith("/static/photos/"):
         filename = photo_path.removeprefix("/static/photos/")
