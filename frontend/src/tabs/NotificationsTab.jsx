@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getStudentsBelowTarget, sendAchievementReminders } from '../api'
+import { shared as sh } from './sharedStyles'
 
 const YEARS = ['I', 'II', 'III', 'IV']
 
@@ -29,7 +30,7 @@ export default function NotificationsTab() {
 
   const send = async () => {
     if (!students.length) return alert('Preview the students to notify first.')
-    const withEmail = students.filter(student => student.email).length
+    const withEmail = students.filter(s => s.email).length
     if (!withEmail) return alert('None of the listed students has an email address.')
     if (!confirm(`Send achievement reminders to ${withEmail} student(s)?`)) return
 
@@ -45,47 +46,129 @@ export default function NotificationsTab() {
   }
 
   return (
-    <div style={s.wrap}>
-      <div style={s.header}>
-        <h1 style={s.title}>Achievement Mail Reminders</h1>
-        <p style={s.subtitle}>Notify students who have not yet reached the selected achievement target.</p>
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      {/* Page Header */}
+      <div style={s.headerRow}>
+        <div>
+          <div style={s.headerBadge}>BULK EMAIL NOTIFICATIONS</div>
+          <h1 style={sh.pageTitle}>Achievement Mail Reminders</h1>
+          <div style={sh.pageTitleUnderline} />
+        </div>
       </div>
 
-      <div style={s.card}>
-        <div style={s.controls}>
-          <label style={s.label}>Minimum achievements
-            <input style={s.input} type="number" min="1" value={minimum} onChange={e => setMinimum(Math.max(1, Number(e.target.value) || 1))} />
-          </label>
-          <label style={s.label}>Year (optional)
-            <select style={s.input} value={year} onChange={e => setYear(e.target.value)}>
-              <option value="">All years</option>
-              {YEARS.map(value => <option key={value} value={value}>{value} Year</option>)}
+      {/* Controls Card */}
+      <div style={sh.card}>
+        <div style={s.formGrid}>
+          <div style={s.fieldGroup}>
+            <label style={s.fieldLabel}>Minimum Achievements Target</label>
+            <input
+              style={sh.input}
+              type="number"
+              min="1"
+              value={minimum}
+              onChange={e => setMinimum(Math.max(1, Number(e.target.value) || 1))}
+            />
+          </div>
+
+          <div style={s.fieldGroup}>
+            <label style={s.fieldLabel}>Filter by Year (optional)</label>
+            <select style={sh.select} value={year} onChange={e => setYear(e.target.value)}>
+              <option value="">All Academic Years</option>
+              {YEARS.map(y => <option key={y} value={y}>{y} Year</option>)}
             </select>
-          </label>
-          <label style={s.label}>Section (optional)
-            <input style={s.input} placeholder="e.g. A" value={section} onChange={e => setSection(e.target.value)} />
-          </label>
-          <button style={s.previewBtn} onClick={preview} disabled={loading}>{loading ? 'Loading...' : 'Preview Students'}</button>
-          <button style={{ ...s.sendBtn, opacity: students.length && !sending ? 1 : 0.55 }} onClick={send} disabled={!students.length || sending}>
-            {sending ? 'Sending...' : 'Send Reminders'}
+          </div>
+
+          <div style={s.fieldGroup}>
+            <label style={s.fieldLabel}>Filter by Section (optional)</label>
+            <input
+              style={sh.input}
+              placeholder="e.g. A"
+              value={section}
+              onChange={e => setSection(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div style={s.actionRow}>
+          <button style={sh.btnPrimary} onClick={preview} disabled={loading}>
+            {loading ? 'Loading Preview...' : '🔍 Preview Recipients'}
+          </button>
+          <button
+            style={{ ...sh.btnGreen, opacity: students.length && !sending ? 1 : 0.5, cursor: students.length && !sending ? 'pointer' : 'not-allowed' }}
+            onClick={send}
+            disabled={!students.length || sending}
+          >
+            {sending ? 'Sending...' : '📧 Send Reminders'}
           </button>
         </div>
-        <p style={s.note}>Only students with an email address receive a reminder. The message includes their current count and target.</p>
+
+        <p style={s.hintText}>
+          ℹ️ Only students with a registered email address receive a reminder. The message includes their current achievement count and target.
+        </p>
       </div>
 
-      {result && <div style={s.result}>
-        Sent: <strong>{result.sent}</strong> · No email: <strong>{result.skipped_no_email.length}</strong> · Failed: <strong>{result.failures.length}</strong>
-      </div>}
+      {/* Result Banner */}
+      {result && (
+        <div style={s.resultBanner}>
+          <span style={s.resultIcon}>✓</span>
+          <div>
+            <strong>Reminders Sent Successfully</strong>
+            <div style={s.resultDetails}>
+              {result.sent} sent · {result.skipped_no_email?.length || 0} skipped (no email) · {result.failures?.length || 0} failed
+            </div>
+          </div>
+        </div>
+      )}
 
-      <div style={s.tableCard}>
-        <div style={s.tableTitle}>Students below target ({students.length})</div>
-        {students.length === 0 ? <div style={s.empty}>Preview students to review recipients before sending.</div> : (
-          <table style={s.table}>
-            <thead><tr><th style={s.th}>NAME</th><th style={s.th}>ROLL NO</th><th style={s.th}>YEAR / SECTION</th><th style={s.th}>ACHIEVEMENTS</th><th style={s.th}>EMAIL</th></tr></thead>
-            <tbody>{students.map(student => <tr key={student.id}>
-              <td style={s.td}>{student.name}</td><td style={s.td}>{student.roll_no}</td><td style={s.td}>{student.year} / {student.section}</td><td style={s.td}>{student.achievement_count}</td><td style={s.td}>{student.email || 'No email address'}</td>
-            </tr>)}</tbody>
-          </table>
+      {/* Recipients Table */}
+      <div style={sh.card}>
+        <div style={s.tableHeaderRow}>
+          <div style={sh.sectionTitle}>Preview Recipients</div>
+          <span style={s.countBadge}>{students.length} students</span>
+        </div>
+        <p style={sh.sectionSub}>
+          {students.length === 0
+            ? 'Click "Preview Recipients" to see students who will receive the reminder.'
+            : `These students have fewer than ${minimum} achievement(s) and will receive a reminder email.`}
+        </p>
+
+        {students.length > 0 && (
+          <div style={s.tableWrap}>
+            <table style={sh.table}>
+              <thead>
+                <tr>
+                  <th style={sh.th}>#</th>
+                  <th style={sh.th}>Student Name</th>
+                  <th style={sh.th}>Roll Number</th>
+                  <th style={sh.th}>Year / Section</th>
+                  <th style={{ ...sh.th, textAlign: 'center' }}>Achievements</th>
+                  <th style={sh.th}>Email Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((student, i) => (
+                  <tr key={student.id}>
+                    <td style={{ ...sh.td, color: '#94a3b8', fontWeight: 700 }}>{i + 1}</td>
+                    <td style={{ ...sh.td, fontWeight: 700, color: '#0f172a' }}>{student.name}</td>
+                    <td style={sh.td}>
+                      <span style={s.rollChip}>{student.roll_no}</span>
+                    </td>
+                    <td style={sh.td}>{student.year} Year / Section {student.section}</td>
+                    <td style={{ ...sh.td, textAlign: 'center' }}>
+                      <span style={s.achCount}>{student.achievement_count}</span>
+                    </td>
+                    <td style={sh.td}>
+                      {student.email ? (
+                        <span style={s.emailBadge}>✓ {student.email}</span>
+                      ) : (
+                        <span style={s.noEmailBadge}>No email</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
@@ -93,15 +176,125 @@ export default function NotificationsTab() {
 }
 
 const s = {
-  wrap: { animation: 'fadeIn 0.3s ease' },
-  header: { marginBottom: 18 }, title: { margin: 0, color: '#1a2469', fontSize: 22, fontWeight: 800 }, subtitle: { margin: '6px 0 0', color: '#666', fontSize: 13.5 },
-  card: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 6px rgba(0,0,0,0.06)', marginBottom: 16 },
-  controls: { display: 'flex', gap: 12, alignItems: 'end', flexWrap: 'wrap' }, label: { display: 'flex', flexDirection: 'column', gap: 6, color: '#555', fontSize: 12.5, fontWeight: 600 },
-  input: { padding: '8px 10px', border: '1.5px solid #ddd', borderRadius: 7, minWidth: 130, fontSize: 13 },
-  previewBtn: { padding: '9px 16px', border: 'none', borderRadius: 7, background: '#1a2469', color: '#fff', fontWeight: 600, fontSize: 13 },
-  sendBtn: { padding: '9px 16px', border: 'none', borderRadius: 7, background: '#2e7d5b', color: '#fff', fontWeight: 600, fontSize: 13 },
-  note: { margin: '14px 0 0', color: '#777', fontSize: 12.5 }, result: { marginBottom: 16, padding: '11px 14px', borderRadius: 8, background: '#eaf6ef', color: '#236544', fontSize: 13 },
-  tableCard: { background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }, tableTitle: { padding: '15px 16px', color: '#1a2469', fontWeight: 700, fontSize: 14 },
-  table: { width: '100%', borderCollapse: 'collapse' }, th: { padding: '11px 14px', background: '#1a2469', color: '#fff', textAlign: 'left', fontSize: 11.5, letterSpacing: 0.4 }, td: { padding: '11px 14px', borderBottom: '1px solid #f2f2f5', color: '#444', fontSize: 13 },
-  empty: { padding: 32, textAlign: 'center', color: '#999', fontSize: 13.5 },
+  headerRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  headerBadge: {
+    display: 'inline-block',
+    fontSize: 10.5,
+    fontWeight: 800,
+    color: '#2563eb',
+    background: '#eff6ff',
+    padding: '3px 9px',
+    borderRadius: 6,
+    letterSpacing: '0.06em',
+    marginBottom: 6,
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 16,
+    marginBottom: 20,
+  },
+  fieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+  },
+  actionRow: {
+    display: 'flex',
+    gap: 12,
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  hintText: {
+    margin: 0,
+    fontSize: 12.5,
+    color: '#64748b',
+    lineHeight: 1.5,
+  },
+  resultBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    borderRadius: 12,
+    padding: '14px 18px',
+    marginBottom: 20,
+  },
+  resultIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    background: '#10b981',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 800,
+    fontSize: 14,
+    flexShrink: 0,
+  },
+  resultDetails: {
+    fontSize: 12.5,
+    color: '#065f46',
+    marginTop: 2,
+  },
+  tableHeaderRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  countBadge: {
+    fontSize: 11.5,
+    fontWeight: 700,
+    background: '#f1f5f9',
+    color: '#475569',
+    padding: '3px 10px',
+    borderRadius: 999,
+  },
+  tableWrap: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    border: '1px solid #e2e8f0',
+    marginTop: 16,
+  },
+  rollChip: {
+    fontFamily: 'monospace',
+    fontWeight: 700,
+    fontSize: 12,
+    color: '#2563eb',
+    background: '#eff6ff',
+    padding: '3px 8px',
+    borderRadius: 6,
+  },
+  achCount: {
+    fontSize: 13,
+    fontWeight: 800,
+    color: '#dc2626',
+    background: '#fef2f2',
+    padding: '3px 10px',
+    borderRadius: 6,
+    border: '1px solid #fecaca',
+  },
+  emailBadge: {
+    fontSize: 11.5,
+    color: '#059669',
+    fontWeight: 600,
+  },
+  noEmailBadge: {
+    fontSize: 11.5,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
 }

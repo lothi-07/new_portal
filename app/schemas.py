@@ -50,6 +50,9 @@ class StudentCreate(StudentBase):
 class StudentOut(StudentBase):
     id: int
     achievement_count: Optional[int] = 0
+    mentor_id: Optional[int] = None
+    mentor_name: Optional[str] = None
+    mentor_email: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -60,6 +63,15 @@ class StudentDetail(StudentOut):
 
     class Config:
         from_attributes = True
+
+
+class BulkMentorAssignment(BaseModel):
+    student_ids: List[int]
+    mentor_id: Optional[int] = None
+
+
+class SelfMentorAssignment(BaseModel):
+    student_ids: List[int]
 
 
 class AdminSignup(BaseModel):

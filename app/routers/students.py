@@ -11,10 +11,65 @@ from openpyxl.styles import Font, PatternFill
 
 from .. import models, schemas
 from ..database import get_db
-from ..auth import get_current_admin, get_current_student_or_admin
+from ..auth import get_current_admin, get_current_student_or_admin, get_current_staff_or_admin
 from ..storage import public_photo_url
 
 router = APIRouter(prefix="/students", tags=["Students"])
+
+
+@router.get("/my-mentees")
+def list_my_mentees(
+    current_user: dict = Depends(get_current_staff_or_admin),
+    db: Session = Depends(get_db),
+):
+    """Return every student assigned to the signed-in staff mentor, not only event participants."""
+    query = db.query(models.Student).order_by(models.Student.roll_no)
+    if current_user["role"] == "staff":
+        mentor = db.query(models.StaffUser).filter(
+            models.StaffUser.email == current_user["email"],
+            models.StaffUser.is_active.is_(True),
+        ).first()
+        if not mentor:
+            raise HTTPException(status_code=403, detail="Active staff account not found")
+        query = query.filter(models.Student.mentor_id == mentor.id)
+
+    students = query.all()
+    return [
+        {
+            "id": student.id,
+            "roll_no": student.roll_no,
+            "reg_no": student.reg_no,
+            "name": f"{student.first_name} {student.last_name or ''}".strip(),
+            "email": student.email,
+            "mobile_number": student.mobile_number,
+            "year": student.year,
+            "section": student.section,
+            "department": student.department,
+            "photo_path": public_photo_url(student.photo_path, student.roll_no),
+            "total_points": student.total_points or 0,
+            "total_events": student.total_events or 0,
+            "current_badge": student.current_badge,
+            "achievement_count": len(student.achievements),
+            "achievements": [
+                {
+                    "id": achievement.id,
+                    "event_name": achievement.event_name,
+                    "event_type": achievement.event_type,
+                    "prize_type": achievement.prize_type,
+                    "event_date": achievement.event_date,
+                    "organizer": achievement.organizer,
+                    "college_name": achievement.college_name,
+                    "certificate_upload_path": achievement.certificate_upload_path,
+                }
+                for achievement in sorted(
+                    student.achievements,
+                    key=lambda item: item.event_date or "",
+                    reverse=True,
+                )
+            ],
+        }
+        for student in students
+    ]
 
 
 @router.get("/", response_model=List[schemas.StudentOut])
@@ -52,6 +107,8 @@ def list_students(
     for s in students:
         d = schemas.StudentOut.model_validate(s).model_dump()
         d["achievement_count"] = counts.get(s.id, 0)
+        d["mentor_name"] = s.mentor.name if s.mentor else None
+        d["mentor_email"] = s.mentor.email if s.mentor else None
         d["photo_path"] = public_photo_url(d.get("photo_path"), s.roll_no)
         out.append(d)
     return out
@@ -95,12 +152,102 @@ def export_students(
     )
 
 
+@router.put("/bulk/mentor")
+def assign_mentor_to_students(
+    payload: schemas.BulkMentorAssignment,
+    db: Session = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+):
+    student_ids = list(dict.fromkeys(payload.student_ids))
+    if not student_ids:
+        raise HTTPException(status_code=400, detail="Select at least one student")
+
+    mentor = None
+    if payload.mentor_id is not None:
+        mentor = db.query(models.StaffUser).filter(
+            models.StaffUser.id == payload.mentor_id,
+            models.StaffUser.is_active.is_(True),
+        ).first()
+        if not mentor:
+            raise HTTPException(status_code=404, detail="Active staff mentor not found")
+
+    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(status_code=404, detail="One or more selected students were not found")
+
+    for student in students:
+        student.mentor_id = payload.mentor_id
+    db.commit()
+
+    return {
+        "updated_count": len(students),
+        "mentor_id": mentor.id if mentor else None,
+        "mentor_name": mentor.name if mentor else None,
+        "mentor_email": mentor.email if mentor else None,
+    }
+
+
+@router.delete("/mentors")
+def reset_all_mentor_assignments(
+    db: Session = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+):
+    """Clear every student-to-mentor assignment so administrators can start over."""
+    updated_count = db.query(models.Student).filter(
+        models.Student.mentor_id.isnot(None)
+    ).update(
+        {models.Student.mentor_id: None},
+        synchronize_session=False,
+    )
+    db.commit()
+    return {"updated_count": updated_count}
+
+
+@router.put("/self/mentor")
+def assign_students_to_self(
+    payload: schemas.SelfMentorAssignment,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_staff_or_admin),
+):
+    """Allow staff to claim selected students as their own mentees."""
+    if current_user["role"] != "staff":
+        raise HTTPException(status_code=403, detail="Only staff members can self-assign mentees")
+
+    student_ids = list(dict.fromkeys(payload.student_ids))
+    if not student_ids:
+        raise HTTPException(status_code=400, detail="Select at least one student")
+
+    mentor = db.query(models.StaffUser).filter(
+        models.StaffUser.email == current_user["email"],
+        models.StaffUser.is_active.is_(True),
+    ).first()
+    if not mentor:
+        raise HTTPException(status_code=403, detail="Active staff account not found")
+
+    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    if len(students) != len(student_ids):
+        raise HTTPException(status_code=404, detail="One or more selected students were not found")
+
+    for student in students:
+        student.mentor_id = mentor.id
+    db.commit()
+
+    return {
+        "updated_count": len(students),
+        "mentor_id": mentor.id,
+        "mentor_name": mentor.name,
+        "mentor_email": mentor.email,
+    }
+
+
 @router.get("/{student_id}", response_model=schemas.StudentDetail)
 def get_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     result = schemas.StudentDetail.model_validate(student).model_dump()
+    result["mentor_name"] = student.mentor.name if student.mentor else None
+    result["mentor_email"] = student.mentor.email if student.mentor else None
     result["photo_path"] = public_photo_url(result.get("photo_path"), student.roll_no)
     return result
 
@@ -185,6 +332,62 @@ def create_student(
         ) from exc
     db.refresh(db_student)
     return db_student
+
+
+@router.put("/{student_id}/mentor")
+def assign_mentor(
+    student_id: int,
+    mentor_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_staff_or_admin),
+):
+    if current_user["role"] == "staff":
+        mentor = db.query(models.StaffUser).filter(
+            models.StaffUser.email == current_user["email"],
+            models.StaffUser.is_active.is_(True),
+        ).first()
+        if not mentor:
+            raise HTTPException(status_code=403, detail="Active staff account not found")
+        mentor_id = mentor.id
+
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    mentor = None
+    if mentor_id is not None:
+        mentor = db.query(models.StaffUser).filter(
+            models.StaffUser.id == mentor_id,
+            models.StaffUser.is_active.is_(True),
+        ).first()
+        if not mentor:
+            raise HTTPException(status_code=404, detail="Active staff mentor not found")
+    student.mentor_id = mentor_id
+    db.commit()
+    return {
+        "student_id": student.id,
+        "mentor_id": mentor.id if mentor else None,
+        "mentor_name": mentor.name if mentor else None,
+        "mentor_email": mentor.email if mentor else None,
+    }
+
+
+@router.delete("/{student_id}/mentor")
+def remove_student_mentor(
+    student_id: int,
+    db: Session = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+):
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    student.mentor_id = None
+    db.commit()
+    return {
+        "student_id": student.id,
+        "mentor_id": None,
+        "mentor_name": None,
+        "mentor_email": None,
+    }
 
 
 @router.put("/{student_id}", response_model=schemas.StudentOut)

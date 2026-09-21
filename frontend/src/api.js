@@ -1,6 +1,9 @@
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// LinkedIn's crawler must be able to reach this URL. Keep it separate from
+// the local API URL so local development cannot produce an unusable share link.
+export const PUBLIC_API_URL = (import.meta.env.VITE_PUBLIC_API_URL || API_URL).replace(/\/+$/, '')
 
 const api = axios.create({ baseURL: API_URL })
 
@@ -21,6 +24,15 @@ export const listStaffAccounts = () => api.get('/auth/staff')
 // ---- Students ----
 export const searchStudents = (params) => api.get('/students/', { params })
 export const getStudent = (id) => api.get(`/students/${id}`)
+export const getMyMentees = () => api.get('/students/my-mentees')
+export const assignStudentMentor = (studentId, mentorId) =>
+  api.put(`/students/${studentId}/mentor`, null, { params: { mentor_id: mentorId || undefined } })
+export const assignMentorToStudents = (studentIds, mentorId) =>
+  api.put('/students/bulk/mentor', { student_ids: studentIds, mentor_id: mentorId || null })
+export const resetAllMentorAssignments = () => api.delete('/students/mentors')
+export const removeStudentMentor = (studentId) => api.delete(`/students/${studentId}/mentor`)
+export const assignStudentsToSelf = (studentIds) =>
+  api.put('/students/self/mentor', { student_ids: studentIds })
 export const createStudent = (data) => api.post('/students/', data)
 export const updateStudent = (id, data) => api.put(`/students/${id}`, data)
 export const deleteStudent = (id) => api.delete(`/students/${id}`)
@@ -90,6 +102,12 @@ export const importStudents = (formData) =>
   api.post('/import/students', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 export const API_BASE = API_URL
+export const publicAssetUrl = (assetPath) => {
+  if (!assetPath) return null
+  if (/^https?:\/\//i.test(assetPath)) return assetPath
+  const normalizedPath = assetPath.startsWith('/') ? assetPath : `/${assetPath}`
+  return `${PUBLIC_API_URL}${normalizedPath}`
+}
 export const photoUrl = (photoPath) => {
   if (!photoPath) return null
   if (/^https?:\/\//i.test(photoPath)) return photoPath

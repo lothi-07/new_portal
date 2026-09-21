@@ -1,24 +1,23 @@
 import { useState, useEffect } from 'react'
-import { API_BASE, getStudent, listEventFlyers, getMyRegistrations, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl } from './api'
+import { API_BASE, getStudent, listEventFlyers, getMyRegistrations, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl, publicAssetUrl } from './api'
 import StudentDashboardTab from './tabs/StudentDashboardTab'
 import CertificateViewer from './components/CertificateViewer'
-import StudentLeaderboardTab from './tabs/StudentLeaderboardTab'
 
 const EVENT_TYPES = ['Technical', 'Non-Technical', 'Sports', 'Cultural', 'Other']
 const PRIZE_TYPES = ['1st Prize', '2nd Prize', '3rd Prize', 'Participation']
 
 const SIDEBAR_ITEMS = [
-  { id: 'dashboard', icon: '▦', label: 'DASHBOARD' },
-  { id: 'participation', icon: '♕', label: 'MY ACHIEVEMENTS' },
-  { id: 'certificates', icon: '▤', label: 'CERTIFICATES' },
+  { id: 'dashboard', icon: DashboardIcon, label: 'Dashboard & Events' },
+  { id: 'participation', icon: TrophyIcon, label: 'My Achievements' },
+  { id: 'certificates', icon: CertIcon, label: 'Verified Certificates' },
 ]
 
 const TOP_LINES = [
-  "Every certificate is one step closer to legendary 🏆",
-  "Small wins today, big trophies tomorrow 🚀",
-  "You're closer to #1 than you think 😉",
-  "Keep going — your future self is already proud 🌟",
-  "Achievements loading... don't stop now!",
+  "Every certificate is one step closer to your dream career 🏆",
+  "Small daily wins lead to monumental achievements 🚀",
+  "Keep striving — excellence is a persistent habit 🌟",
+  "Your achievements shape your professional legacy 💼",
+  "Milestones loading... continue your innovation journey!",
 ]
 
 export default function StudentView({ session, onLogout }) {
@@ -32,6 +31,12 @@ export default function StudentView({ session, onLogout }) {
       email: session?.email || 'Not on file',
       photo_path: session?.photo_path || '',
       achievements: [],
+      mobile_number: session?.mobile_number || 'N/A',
+      reg_no: session?.reg_no || 'N/A',
+      department: session?.department || 'N/A',
+      mentor_id: session?.mentor_id || null,
+      mentor_name: session?.mentor_name || '',
+      mentor_email: session?.mentor_email || '',
     }
   })
   const [flyers, setFlyers] = useState([])
@@ -42,7 +47,6 @@ export default function StudentView({ session, onLogout }) {
   const [showAddAchievement, setShowAddAchievement] = useState(false)
   const [showUploadCertificate, setShowUploadCertificate] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [selectedVoucher, setSelectedVoucher] = useState(null)
   const [selectedCertificate, setSelectedCertificate] = useState(null)
   const [manualForm, setManualForm] = useState({
     event_name: '',
@@ -57,10 +61,15 @@ export default function StudentView({ session, onLogout }) {
   const [copiedCertId, setCopiedCertId] = useState(null)
   const [topLine] = useState(() => TOP_LINES[Math.floor(Math.random() * TOP_LINES.length)])
 
-  const certUrl = (path) => (path?.startsWith('http') ? path : `${API_BASE}${path}`)
+  const certUrl = (path) => publicAssetUrl(path) || ''
 
   const shareCertToLinkedIn = (cert) => {
     const url = certUrl(cert.certificate_upload_path)
+    const shareHost = new URL(url).hostname
+    if (['localhost', '127.0.0.1', '::1'].includes(shareHost)) {
+      alert('LinkedIn cannot access certificates from localhost. Set VITE_PUBLIC_API_URL to your deployed API URL and restart the frontend.')
+      return
+    }
     const shareLink = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
     window.open(shareLink, '_blank', 'noopener,noreferrer')
   }
@@ -70,9 +79,9 @@ export default function StudentView({ session, onLogout }) {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedCertId(cert.id)
-      setTimeout(() => setCopiedCertId(null), 1800)
-    } catch (error) {
-      alert('Could not copy the link. Long-press or right-click the certificate to copy its URL instead.')
+      setTimeout(() => setCopiedCertId(null), 2000)
+    } catch {
+      alert('Could not copy the link directly. You can right-click and copy the certificate URL.')
     }
   }
 
@@ -82,7 +91,9 @@ export default function StudentView({ session, onLogout }) {
     if (!studentId && !session?.roll_no) return
 
     try {
-      const studentRes = studentId ? await getStudent(studentId) : { data: { ...profile, first_name: session?.name?.split(' ')[0] || session?.first_name || 'Student' } }
+      const studentRes = studentId
+        ? await getStudent(studentId)
+        : { data: { ...profile, first_name: session?.name?.split(' ')[0] || session?.first_name || 'Student' } }
       const [flyersRes, registrationsRes] = await Promise.all([listEventFlyers(), getMyRegistrations()])
 
       const studentData = studentRes?.data || {}
@@ -97,6 +108,9 @@ export default function StudentView({ session, onLogout }) {
         mobile_number: studentData.mobile_number || session?.mobile_number || 'N/A',
         reg_no: studentData.reg_no || session?.reg_no || 'N/A',
         department: studentData.department || session?.department || 'N/A',
+        mentor_id: studentData.mentor_id || session?.mentor_id || null,
+        mentor_name: studentData.mentor_name || session?.mentor_name || '',
+        mentor_email: studentData.mentor_email || session?.mentor_email || '',
       }
 
       setProfile(mergedProfile)
@@ -104,17 +118,6 @@ export default function StudentView({ session, onLogout }) {
       setRegistrations(Array.isArray(registrationsRes?.data) ? registrationsRes.data : [])
     } catch (error) {
       console.error('Failed to load student view:', error)
-      setProfile({
-        first_name: session?.name?.split(' ')[0] || session?.first_name || 'Student',
-        roll_no: session?.roll_no || 'N/A',
-        section: session?.section || 'N/A',
-        year: session?.year || 'N/A',
-        email: session?.email || 'Not on file',
-        photo_path: session?.photo_path || '',
-        achievements: [],
-      })
-      setFlyers([])
-      setRegistrations([])
     }
   }
 
@@ -130,17 +133,11 @@ export default function StudentView({ session, onLogout }) {
 
   const achievements = Array.isArray(profile?.achievements) ? profile.achievements : []
   const displayName = profile.first_name || session?.name || 'Student'
-  const profileInitials = displayName
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || 'ST'
-  const profilePhotoUrl = photoUrl(profile.photo_path) || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1a2469&color=fff&rounded=true`
+  const profilePhotoUrl = photoUrl(profile.photo_path) || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=2563eb&color=fff&rounded=true`
 
   const handleDeleteAchievement = async (achievementId) => {
     if (!achievementId) return
-    if (!window.confirm('Delete this achievement?')) return
+    if (!window.confirm('Are you sure you want to delete this achievement record?')) return
 
     try {
       await deleteAchievement(achievementId)
@@ -159,7 +156,7 @@ export default function StudentView({ session, onLogout }) {
       const res = await uploadStudentPhoto(studentId, file)
       setProfile(prev => ({ ...prev, photo_path: res.data.photo_path }))
     } catch (error) {
-      alert(error.response?.data?.detail || 'Unable to upload photo')
+      alert(error.response?.data?.detail || 'Unable to update profile photo')
     } finally {
       setUploadingPhoto(false)
       event.target.value = ''
@@ -170,12 +167,14 @@ export default function StudentView({ session, onLogout }) {
     const file = event.target.files?.[0]
     if (!file) return
     setVoucherUploaded(true)
-    alert('Event voucher uploaded. You can now add your achievement.')
+    alert('Event voucher uploaded successfully. You may now record your achievement details.')
     event.target.value = ''
   }
 
   const submitManualAchievement = async () => {
-    if (!manualForm.event_name || !certificateFile) return alert('Event name and participation certificate are required')
+    if (!manualForm.event_name || !certificateFile) {
+      return alert('Event name and participation certificate are required')
+    }
     setSaving(true)
     try {
       const fd = new FormData()
@@ -202,7 +201,9 @@ export default function StudentView({ session, onLogout }) {
   }
 
   const submitCertificate = async () => {
-    if (!manualForm.event_name || !certificateFile) return alert('Event name and certificate image are required')
+    if (!manualForm.event_name || !certificateFile) {
+      return alert('Event name and certificate file are required')
+    }
     setSaving(true)
     try {
       const fd = new FormData()
@@ -230,127 +231,266 @@ export default function StudentView({ session, onLogout }) {
 
   return (
     <div style={styles.pageShell}>
+      {/* ── Sidebar ── */}
       <aside style={styles.studentSidebar}>
-        <div style={styles.studentBrand}><strong>Achievement<br />Portal</strong></div>
-        {SIDEBAR_ITEMS.map(({ id, icon, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveTab(id)}
-            style={{ ...styles.studentNavItem, ...(activeTab === id ? styles.studentNavActive : {}) }}
-          >
-            <span style={styles.studentNavIcon}>{icon}</span><span>{label}</span>
+        {/* Brand */}
+        <div style={styles.studentBrand}>
+          <div style={styles.brandLogo}>ESEC</div>
+          <div>
+            <div style={styles.brandTitle}>Student Portal</div>
+            <div style={styles.brandCollege}>ERODE SENGUNTHAR</div>
+            <div style={styles.brandCollege}>ENGINEERING COLLEGE</div>
+          </div>
+        </div>
+
+        {/* Student Quick Profile Card */}
+        <div style={styles.profileBadgeCard}>
+          <label style={styles.avatarLabel} title="Click to change profile picture">
+            <img src={profilePhotoUrl} alt={displayName} style={styles.avatarImg} />
+            <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+            <div style={styles.avatarHoverIcon}>📷</div>
+          </label>
+          <div style={styles.profileInfo}>
+            <div style={styles.profileName} title={displayName}>{displayName}</div>
+            <div style={styles.profileRoll}>{profile.roll_no}</div>
+            <div style={styles.profileDept}>
+              {profile.year} Year • {profile.department !== 'N/A' ? profile.department : 'Engineering'}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav style={styles.navStack}>
+          <div style={styles.navHeader}>NAVIGATION</div>
+          {SIDEBAR_ITEMS.map(({ id, icon: Icon, label }) => {
+            const active = activeTab === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                style={{ ...styles.studentNavItem, ...(active ? styles.studentNavActive : {}) }}
+              >
+                <div style={{ ...styles.navIconBox, ...(active ? styles.navIconBoxActive : {}) }}>
+                  <Icon active={active} />
+                </div>
+                <span style={styles.navItemLabel}>{label}</span>
+                {active && <span style={styles.navActiveDot} />}
+              </button>
+            )
+          })}
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div style={styles.sidebarFooter}>
+          <button type="button" onClick={onLogout} style={styles.logoutBtn}>
+            <LogoutIcon />
+            <span>Sign Out</span>
           </button>
-        ))}
-        <button type="button" onClick={onLogout} style={styles.studentNavItem}><span style={styles.studentNavIcon}>↪</span><span>LOGOUT</span></button>
+        </div>
       </aside>
+
+      {/* ── Main Area ── */}
       <div style={styles.pageWrap}>
+        {/* Top Bar */}
         <header style={styles.topBar}>
-          <div style={styles.topBrand}><span style={styles.topBrandMark}>[A]</span><strong>{topLine}</strong></div>
-          <button  style={styles.topActions} ><span style={styles.topAvatar}>{displayName.charAt(0).toUpperCase()}</span><strong>{displayName}</strong></button>
+          <div style={styles.topGreeting}>
+            <span style={styles.greetingPill}>Campus News</span>
+            <span style={styles.topLineText}>{topLine}</span>
+          </div>
+
+          <div style={styles.topRight}>
+            <div style={styles.userChip}>
+              <img src={profilePhotoUrl} alt="" style={styles.chipAvatar} />
+              <div style={styles.chipMeta}>
+                <span style={styles.chipName}>{displayName}</span>
+                <span style={styles.chipRole}>Student</span>
+              </div>
+            </div>
+          </div>
         </header>
 
-        <section style={styles.dashboardTabs}>
+        {/* Tab Content Panes */}
+        <main style={styles.mainContent}>
           {activeTab === 'dashboard' && (
-            <div style={styles.tabContent}>
-              <StudentDashboardTab studentId={studentId} profile={profile} flyers={flyers} onNavigateTab={setActiveTab} />
-            </div>
-          )}
-          {activeTab === 'leaderboard' && (
-            <div style={styles.tabContent}><StudentLeaderboardTab studentId={studentId} /></div>
+            <StudentDashboardTab
+              studentId={studentId}
+              profile={profile}
+              flyers={flyers}
+              onNavigateTab={setActiveTab}
+            />
           )}
 
           {activeTab === 'participation' && (
-            <div style={styles.tabContent}>
-              <div style={styles.actionRow}>
-                <label style={styles.uploadBtn}>
-                  <input type="file" accept="image/*,.pdf" onChange={handleVoucherUpload} style={{ display: 'none' }} />
-                  Upload Event Voucher
-                </label>
-                <button
-                  onClick={() => setShowAddAchievement(true)}
-                  disabled={!voucherUploaded}
-                  style={{ ...styles.primaryBtn, opacity: voucherUploaded ? 1 : 0.5 }}
-                >
-                  Add Achievement
-                </button>
+            <div style={styles.tabCardWrap}>
+              <div style={styles.pageTitleBar}>
+                <div>
+                  <h1 style={styles.pageTitle}>My Achievements</h1>
+                  <p style={styles.pageSub}>Official records of your academic and extracurricular recognitions.</p>
+                </div>
+
+                <div style={styles.actionRow}>
+                  <label style={styles.voucherUploadBtn}>
+                    <input type="file" accept="image/*,.pdf" onChange={handleVoucherUpload} style={{ display: 'none' }} />
+                    📎 {voucherUploaded ? '✓ Voucher Uploaded' : 'Upload Event Voucher'}
+                  </label>
+                  <button
+                    onClick={() => setShowAddAchievement(true)}
+                    disabled={!voucherUploaded}
+                    style={{ ...styles.addAchievementBtn, opacity: voucherUploaded ? 1 : 0.6 }}
+                  >
+                    + Add Achievement Record
+                  </button>
+                </div>
               </div>
 
               {!voucherUploaded && (
-                <div style={styles.warningBox}>
-                  Upload your event voucher first to unlock achievement entry.
+                <div style={styles.voucherHintBox}>
+                  <div style={styles.hintIcon}>ℹ️</div>
+                  <div>
+                    <strong>Verification Rule:</strong> Upload your event confirmation voucher or fee receipt first to unlock manual achievement entry.
+                  </div>
                 </div>
               )}
 
               {achievements.length === 0 ? (
-                <div style={styles.emptyState}>No achievements recorded yet. Start adding your participation!</div>
+                <div style={styles.emptyCard}>
+                  <div style={styles.emptyIcon}>🏆</div>
+                  <h3 style={styles.emptyHeading}>No Achievements Recorded Yet</h3>
+                  <p style={styles.emptyText}>Upload your participation certificate and win prizes to build your college milestone portfolio!</p>
+                </div>
               ) : (
-                <div style={styles.achievementList}>
-                  {achievements.map(a => (
-                    <div key={a.id || `${a.event_name}-${a.event_date}`} style={styles.achievementCard}>
-                      <div style={styles.awardBadge}>{a.prize_type || 'Participation'}</div>
-                      <div style={styles.achievementInfo}>
-                        <h4 style={styles.achievementTitle}>{a.event_name}</h4>
-                        <p style={styles.achievementMeta}>
-                          {a.event_type} • {a.organizer} • {a.event_date}
-                        </p>
-                      </div>
-                      <div style={styles.achievementActions}>
-                        {a.certificate_upload_path && (
-                          <button 
-                            onClick={() => setSelectedCertificate({
-                              url: `${API_BASE}${a.certificate_upload_path}`,
-                              eventName: a.event_name,
-                              eventType: a.event_type,
-                              prize: a.prize_type,
-                              eventDate: a.event_date
-                            })}
-                            style={styles.viewBtn}
+                <div style={styles.achievementGrid}>
+                  {achievements.map((a, idx) => {
+                    const prize = a.prize_type || 'Participation'
+                    const isWinner = prize.includes('1st') || prize.includes('2nd') || prize.includes('3rd')
+                    return (
+                      <div key={a.id || idx} style={styles.achievementCard}>
+                        <div style={styles.achievementHeader}>
+                          <span style={getPrizeBadgeStyle(prize)}>{prize}</span>
+                          <span style={styles.eventTypeTag}>{a.event_type || 'General'}</span>
+                        </div>
+
+                        <h3 style={styles.achievementTitle}>{a.event_name}</h3>
+
+                        <div style={styles.achievementMeta}>
+                          {a.organizer && <div>🏛️ <strong>Organizer:</strong> {a.organizer}</div>}
+                          {a.college_name && <div>🎓 <strong>College:</strong> {a.college_name}</div>}
+                          {a.event_date && <div>📅 <strong>Date:</strong> {a.event_date}</div>}
+                        </div>
+
+                        <div style={styles.achievementFooter}>
+                          {a.certificate_upload_path ? (
+                            <button
+                              onClick={() => setSelectedCertificate({
+                                url: certUrl(a.certificate_upload_path),
+                                eventName: a.event_name,
+                                eventType: a.event_type,
+                                prize: a.prize_type,
+                                eventDate: a.event_date,
+                              })}
+                              style={styles.viewCertBtn}
+                            >
+                              👁️ View Certificate
+                            </button>
+                          ) : (
+                            <span style={styles.noCertText}>No Certificate Attached</span>
+                          )}
+
+                          <button
+                            onClick={() => handleDeleteAchievement(a.id)}
+                            style={styles.deleteBtn}
+                            title="Delete this record"
                           >
-                            View Certificate
+                            🗑️
                           </button>
-                        )}
-                        <button onClick={() => handleDeleteAchievement(a.id)} style={styles.deleteBtn}>Delete</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'certificates' && (
-            <div style={styles.tabContent}>
-              <div style={styles.certPageHeader}>
-                <h2 style={styles.certPageTitle}>My Verified Certificate Gallery</h2>
+            <div style={styles.tabCardWrap}>
+              <div style={styles.pageTitleBar}>
+                <div>
+                  <h1 style={styles.pageTitle}>Verified Certificate Gallery</h1>
+                  <p style={styles.pageSub}>Institutional credentials, digital badges, and shareable verified certificates.</p>
+                </div>
+                <button
+                  onClick={() => setShowUploadCertificate(true)}
+                  style={styles.addAchievementBtn}
+                >
+                  + Upload New Certificate
+                </button>
               </div>
 
               {achievements.filter(a => a.certificate_upload_path).length === 0 ? (
-                <div style={styles.emptyState}>No certificates uploaded yet.</div>
+                <div style={styles.emptyCard}>
+                  <div style={styles.emptyIcon}>📜</div>
+                  <h3 style={styles.emptyHeading}>No Certificates Uploaded</h3>
+                  <p style={styles.emptyText}>Upload event certificates to build your verified academic repository.</p>
+                </div>
               ) : (
-                <div style={styles.certificateGrid}>
+                <div style={styles.certGrid}>
                   {achievements.filter(a => a.certificate_upload_path).map(a => (
                     <div key={a.id} style={styles.certCard}>
-                      <img
-                        src={certUrl(a.certificate_upload_path)}
-                        alt={a.event_name}
-                        style={styles.certImage}
+                      <div
+                        style={styles.certImageWrap}
                         onClick={() => setSelectedCertificate({
                           url: certUrl(a.certificate_upload_path),
                           eventName: a.event_name,
                           eventType: a.event_type,
                           prize: a.prize_type,
-                          eventDate: a.event_date
+                          eventDate: a.event_date,
                         })}
-                      />
-                      <div style={styles.certCardBody}>
-                        <p style={styles.certName}>{a.event_name}</p>
-                        <small style={styles.certVerified}>✓ Verified</small>
-                        <a href={certUrl(a.certificate_upload_path)} target="_blank" rel="noreferrer" download style={styles.certActionBtn}>Download PDF</a>
-                        <button type="button" style={styles.certActionBtn} onClick={() => shareCertToLinkedIn(a)}>Share to LinkedIn</button>
-                        <button type="button" style={styles.certActionBtn} onClick={() => copyPortfolioUrl(a)}>
-                          {copiedCertId === a.id ? 'Link copied!' : 'Generate Portfolio URL'}
-                        </button>
+                      >
+                        <img
+                          src={certUrl(a.certificate_upload_path)}
+                          alt={a.event_name}
+                          style={styles.certThumb}
+                        />
+                        <div style={styles.certHoverOverlay}>
+                          <span>Click to Expand</span>
+                        </div>
+                      </div>
+
+                      <div style={styles.certCardContent}>
+                        <div style={styles.certBadgeRow}>
+                          <span style={styles.certVerifiedBadge}>✓ Verified Record</span>
+                          <span style={styles.certTypeBadge}>{a.prize_type || 'Award'}</span>
+                        </div>
+                        <h4 style={styles.certTitle}>{a.event_name}</h4>
+                        <p style={styles.certDate}>{a.event_date || 'Milestone Record'}</p>
+
+                        <div style={styles.certActionList}>
+                          <a
+                            href={certUrl(a.certificate_upload_path)}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                            style={styles.certDownloadBtn}
+                          >
+                            ⬇️ Download
+                          </a>
+                          <button
+                            type="button"
+                            style={styles.certShareBtn}
+                            onClick={() => shareCertToLinkedIn(a)}
+                          >
+                            LinkedIn
+                          </button>
+                          <button
+                            type="button"
+                            style={styles.certCopyBtn}
+                            onClick={() => copyPortfolioUrl(a)}
+                          >
+                            {copiedCertId === a.id ? '✓ Copied!' : 'Copy Link'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -358,9 +498,10 @@ export default function StudentView({ session, onLogout }) {
               )}
             </div>
           )}
-        </section>
+        </main>
       </div>
 
+      {/* ── Certificate Fullscreen Viewer Modal ── */}
       {selectedCertificate && (
         <CertificateViewer
           certificateUrl={selectedCertificate.url}
@@ -373,49 +514,192 @@ export default function StudentView({ session, onLogout }) {
         />
       )}
 
+      {/* ── Add Achievement Modal ── */}
       {showAddAchievement && (
         <div style={styles.modalBackdrop} onClick={() => setShowAddAchievement(false)}>
-          <div style={styles.formModal} onClick={e => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>Add Achievement</h3>
-            <select style={styles.formInput} value={selectedRegistrationId} onChange={e => { setSelectedRegistrationId(e.target.value); const item = registrations.find(r => String(r.id) === e.target.value); if (item) setManualForm({ ...manualForm, event_name: item.event_title, event_date: item.event_end_date || item.event_date || '' }) }}><option value="">Link to a registered event (optional)</option>{registrations.map(item => <option key={item.id} value={item.id}>{item.event_title} - {item.verification_status}</option>)}</select>
-            <input style={styles.formInput} placeholder="Event name" value={manualForm.event_name} onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })} />
-            <select style={styles.formInput} value={manualForm.event_type} onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}>
-              {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select style={styles.formInput} value={manualForm.prize_type} onChange={e => setManualForm({ ...manualForm, prize_type: e.target.value })}>
-              {PRIZE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input style={styles.formInput} type="date" value={manualForm.event_date} onChange={e => setManualForm({ ...manualForm, event_date: e.target.value })} />
-            <input style={styles.formInput} placeholder="Organizer" value={manualForm.organizer} onChange={e => setManualForm({ ...manualForm, organizer: e.target.value })} />
-            <input style={styles.formInput} placeholder="Participating college" value={manualForm.college_name} onChange={e => setManualForm({ ...manualForm, college_name: e.target.value })} />
-            <input style={styles.formInput} type="file" accept="image/*,.pdf" onChange={e => setCertificateFile(e.target.files?.[0] || null)} />
-            <div style={styles.formActions}>
-              <button style={styles.primaryBtn} onClick={submitManualAchievement} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-              <button style={styles.secondaryBtn} onClick={() => { setShowAddAchievement(false); setCertificateFile(null) }}>Cancel</button>
+          <div style={styles.modalCard} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalHeading}>Record New Achievement</h3>
+              <button style={styles.modalCloseBtn} onClick={() => setShowAddAchievement(false)}>✕</button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <label style={styles.modalLabel}>Link to Registered Event (Optional)</label>
+              <select
+                style={styles.modalSelect}
+                value={selectedRegistrationId}
+                onChange={e => {
+                  setSelectedRegistrationId(e.target.value)
+                  const item = registrations.find(r => String(r.id) === e.target.value)
+                  if (item) {
+                    setManualForm({
+                      ...manualForm,
+                      event_name: item.event_title,
+                      event_date: item.event_end_date || item.event_date || '',
+                    })
+                  }
+                }}
+              >
+                <option value="">Choose an event registration</option>
+                {registrations.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.event_title} ({item.verification_status || 'Registered'})
+                  </option>
+                ))}
+              </select>
+
+              <label style={styles.modalLabel}>Event Title *</label>
+              <input
+                style={styles.modalInput}
+                placeholder="e.g. National Level Hackathon 2026"
+                value={manualForm.event_name}
+                onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })}
+              />
+
+              <div style={styles.modalGrid2}>
+                <div>
+                  <label style={styles.modalLabel}>Category</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={manualForm.event_type}
+                    onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}
+                  >
+                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.modalLabel}>Prize / Recognition</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={manualForm.prize_type}
+                    onChange={e => setManualForm({ ...manualForm, prize_type: e.target.value })}
+                  >
+                    {PRIZE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={styles.modalGrid2}>
+                <div>
+                  <label style={styles.modalLabel}>Event Date</label>
+                  <input
+                    style={styles.modalInput}
+                    type="date"
+                    value={manualForm.event_date}
+                    onChange={e => setManualForm({ ...manualForm, event_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={styles.modalLabel}>Organizing Body</label>
+                  <input
+                    style={styles.modalInput}
+                    placeholder="e.g. Department of CSE"
+                    value={manualForm.organizer}
+                    onChange={e => setManualForm({ ...manualForm, organizer: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <label style={styles.modalLabel}>College / Institution</label>
+              <input
+                style={styles.modalInput}
+                placeholder="e.g. PSG Tech / IIT Madras / ESEC"
+                value={manualForm.college_name}
+                onChange={e => setManualForm({ ...manualForm, college_name: e.target.value })}
+              />
+
+              <label style={styles.modalLabel}>Certificate File (Image or PDF) *</label>
+              <input
+                style={styles.modalFileInput}
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={e => setCertificateFile(e.target.files?.[0] || null)}
+              />
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button
+                style={styles.modalSecondaryBtn}
+                onClick={() => { setShowAddAchievement(false); setCertificateFile(null) }}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.modalPrimaryBtn}
+                onClick={submitManualAchievement}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Achievement Record'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Upload Certificate Modal ── */}
       {showUploadCertificate && (
         <div style={styles.modalBackdrop} onClick={() => setShowUploadCertificate(false)}>
-          <div style={styles.formModal} onClick={e => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>Upload Certificate</h3>
-            <select style={styles.formInput} value={selectedRegistrationId} onChange={e => { setSelectedRegistrationId(e.target.value); const item = registrations.find(r => String(r.id) === e.target.value); if (item) setManualForm({ ...manualForm, event_name: item.event_title, event_date: item.event_end_date || item.event_date || '' }) }}><option value="">Link to a registered event (optional)</option>{registrations.map(item => <option key={item.id} value={item.id}>{item.event_title} - {item.verification_status}</option>)}</select>
-            <input style={styles.formInput} placeholder="Event name" value={manualForm.event_name} onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })} />
-            <select style={styles.formInput} value={manualForm.event_type} onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}>
-              {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select style={styles.formInput} value={manualForm.prize_type} onChange={e => setManualForm({ ...manualForm, prize_type: e.target.value })}>
-              {PRIZE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input style={styles.formInput} type="date" value={manualForm.event_date} onChange={e => setManualForm({ ...manualForm, event_date: e.target.value })} />
-            <input style={styles.formInput} placeholder="Organizer" value={manualForm.organizer} onChange={e => setManualForm({ ...manualForm, organizer: e.target.value })} />
-            <input style={styles.formInput} placeholder="Participating college" value={manualForm.college_name} onChange={e => setManualForm({ ...manualForm, college_name: e.target.value })} />
-            <input style={styles.formInput} type="file" accept="image/*" onChange={e => setCertificateFile(e.target.files?.[0] || null)} />
-            <div style={styles.formActions}>
-              <button style={styles.primaryBtn} onClick={submitCertificate} disabled={saving}>{saving ? 'Uploading...' : 'Upload'}</button>
-              <button style={styles.secondaryBtn} onClick={() => setShowUploadCertificate(false)}>Cancel</button>
+          <div style={styles.modalCard} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalHeading}>Upload Certificate</h3>
+              <button style={styles.modalCloseBtn} onClick={() => setShowUploadCertificate(false)}>✕</button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <label style={styles.modalLabel}>Event Name *</label>
+              <input
+                style={styles.modalInput}
+                placeholder="e.g. Web Development Symposium"
+                value={manualForm.event_name}
+                onChange={e => setManualForm({ ...manualForm, event_name: e.target.value })}
+              />
+
+              <div style={styles.modalGrid2}>
+                <div>
+                  <label style={styles.modalLabel}>Category</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={manualForm.event_type}
+                    onChange={e => setManualForm({ ...manualForm, event_type: e.target.value })}
+                  >
+                    {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.modalLabel}>Recognition</label>
+                  <select
+                    style={styles.modalSelect}
+                    value={manualForm.prize_type}
+                    onChange={e => setManualForm({ ...manualForm, prize_type: e.target.value })}
+                  >
+                    {PRIZE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <label style={styles.modalLabel}>Certificate File *</label>
+              <input
+                style={styles.modalFileInput}
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={e => setCertificateFile(e.target.files?.[0] || null)}
+              />
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button
+                style={styles.modalSecondaryBtn}
+                onClick={() => setShowUploadCertificate(false)}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.modalPrimaryBtn}
+                onClick={submitCertificate}
+                disabled={saving}
+              >
+                {saving ? 'Uploading...' : 'Upload & Verify'}
+              </button>
             </div>
           </div>
         </div>
@@ -424,365 +708,817 @@ export default function StudentView({ session, onLogout }) {
   )
 }
 
-function SettingsField({ label, value }) {
-  return (
-    <div style={styles.settingsField}>
-      <span style={styles.settingsFieldLabel}>{label}</span>
-      <strong style={styles.settingsFieldValue}>{value}</strong>
-    </div>
-  )
+function getPrizeBadgeStyle(prize = '') {
+  if (prize.includes('1st')) {
+    return {
+      background: '#fef3c7',
+      color: '#b45309',
+      border: '1px solid #fde68a',
+      borderRadius: 999,
+      padding: '4px 12px',
+      fontWeight: 800,
+      fontSize: 11.5,
+    }
+  }
+  if (prize.includes('2nd')) {
+    return {
+      background: '#f1f5f9',
+      color: '#475569',
+      border: '1px solid #cbd5e1',
+      borderRadius: 999,
+      padding: '4px 12px',
+      fontWeight: 800,
+      fontSize: 11.5,
+    }
+  }
+  if (prize.includes('3rd')) {
+    return {
+      background: '#ffedd5',
+      color: '#c2410c',
+      border: '1px solid #fed7aa',
+      borderRadius: 999,
+      padding: '4px 12px',
+      fontWeight: 800,
+      fontSize: 11.5,
+    }
+  }
+  return {
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    borderRadius: 999,
+    padding: '4px 12px',
+    fontWeight: 800,
+    fontSize: 11.5,
+  }
 }
 
+/* ── Modern Styles ── */
 const styles = {
   pageShell: {
-    minHeight: '100vh',
     display: 'flex',
-    background: '#edf4fb',
-    fontFamily: "'Inter', 'Poppins', sans-serif",
-    color: '#161b2d',
+    minHeight: '100vh',
+    background: '#f8fafc',
+    color: '#0f172a',
+    fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
   },
-  studentSidebar: { width: 84, minWidth: 84, minHeight: '100vh', background: '#071126', color: '#c9d3e8', display: 'flex', flexDirection: 'column', alignItems: 'stretch', padding: '12px 0', gap: 4 },
-  studentBrand: { height: 54, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#fff', fontSize: 9, lineHeight: 1.1, textAlign: 'left', marginBottom: 14 },
-  studentBrandMark: { color: '#5453e8', fontSize: 20, fontWeight: 900 },
-  studentNavItem: { minHeight: 62, border: 0, borderLeft: '3px solid transparent', background: 'transparent', color: '#c1cade', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 8, letterSpacing: '.04em', cursor: 'pointer' },
-  studentNavActive: { borderLeftColor: '#4b50ee', background: 'rgba(67,76,210,.22)', color: '#fff' },
-  studentNavIcon: { fontSize: 19, lineHeight: 1, color: '#d8e2f3' },
-  pageWrap: {
-    flex: 1,
-    minWidth: 0,
+
+  /* Sidebar */
+  studentSidebar: {
+    width: 256,
+    minWidth: 256,
+    background: '#0f172a',
+    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    position: 'sticky',
+    top: 0,
+    height: '100vh',
+    zIndex: 20,
+    boxShadow: '4px 0 24px rgba(0, 0, 0, 0.15)',
+  },
+  studentBrand: {
+    padding: '22px 18px 20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+  brandLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    color: '#ffffff',
+    fontWeight: 800,
+    fontSize: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    letterSpacing: 0.5,
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+  },
+  brandTitle: {
+    fontSize: 14,
+    fontWeight: 800,
+    color: '#ffffff',
+    letterSpacing: '-0.01em',
+  },
+  brandCollege: {
+    fontSize: 8.5,
+    fontWeight: 700,
+    color: '#94a3b8',
+    letterSpacing: '0.04em',
+    marginTop: 2,
+  },
+
+  /* Profile Badge Card */
+  profileBadgeCard: {
+    margin: '16px 14px 8px',
+    padding: '14px',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarLabel: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    overflow: 'hidden',
+    cursor: 'pointer',
+    flexShrink: 0,
+    border: '1.5px solid rgba(37, 99, 235, 0.5)',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  avatarHoverIcon: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 14,
+    opacity: 0,
+    transition: 'opacity 0.15s ease',
+    ':hover': { opacity: 1 },
+  },
+  profileInfo: {
+    minWidth: 0,
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 13.5,
+    fontWeight: 700,
+    color: '#ffffff',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  profileRoll: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#38bdf8',
+    letterSpacing: '0.04em',
+    marginTop: 2,
+  },
+  profileDept: {
+    fontSize: 9.5,
+    color: '#94a3b8',
+    marginTop: 2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+
+  /* Nav Stack */
+  navStack: {
+    flex: 1,
+    padding: '12px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+    overflowY: 'auto',
+  },
+  navHeader: {
+    fontSize: 10,
+    fontWeight: 700,
+    color: 'rgba(255, 255, 255, 0.35)',
+    letterSpacing: '0.08em',
+    padding: '12px 10px 6px',
+  },
+  studentNavItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '10px 12px',
+    borderRadius: 10,
+    border: 'none',
+    background: 'transparent',
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    width: '100%',
+    textAlign: 'left',
+    transition: 'all 0.15s ease',
+    position: 'relative',
+  },
+  studentNavActive: {
+    background: 'rgba(37, 99, 235, 0.18)',
+    color: '#60a5fa',
+    fontWeight: 600,
+    border: '1px solid rgba(59, 130, 246, 0.25)',
+  },
+  navIconBox: {
+    width: 22,
+    height: 22,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'inherit',
+    flexShrink: 0,
+  },
+  navIconBoxActive: {
+    color: '#60a5fa',
+  },
+  navItemLabel: {
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  navActiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#38bdf8',
+    boxShadow: '0 0 8px #38bdf8',
+  },
+
+  /* Sidebar Footer */
+  sidebarFooter: {
+    padding: '14px',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'rgba(0, 0, 0, 0.15)',
+  },
+  logoutBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '9px 14px',
+    borderRadius: 8,
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'rgba(255, 255, 255, 0.04)',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+
+  /* Page Wrap & Top Bar */
+  pageWrap: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
   },
   topBar: {
-    height: 54,
-    padding: '0 24px',
-    background: '#fff',
+    height: 64,
+    padding: '0 32px',
+    background: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+  },
+  topGreeting: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    fontSize: 13,
+  },
+  greetingPill: {
+    background: '#fef3c7',
+    color: '#b45309',
+    fontSize: 10.5,
+    fontWeight: 800,
+    padding: '3px 10px',
+    borderRadius: 999,
+    border: '1px solid #fde68a',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  topLineText: {
+    color: '#475569',
+    fontWeight: 600,
+  },
+  topRight: {
+    display: 'flex',
+    alignItems: 'center',
     gap: 16,
-    borderBottom: '1px solid #dce5ef',
   },
-  topBrand: { display: 'flex', alignItems: 'center', gap: 7, color: '#202331', fontSize: 15, flex: 1, minWidth: 0 },
-  topBrandMark: { color: '#4d50c9', fontSize: 20, fontWeight: 900, flexShrink: 0 },
-  topActions: { display: 'flex', alignItems: 'center', gap: 9, color: '#5b6576', fontSize: 12, border: 0, background: 'transparent', cursor: 'pointer' },
-  topAvatar: { width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', background: '#759d65', color: '#fff', fontWeight: 800 },
-  dashboardTabs: {
+  quickUploadBtn: {
+    padding: '8px 16px',
+    borderRadius: 8,
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    color: '#ffffff',
+    fontSize: 12.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+  },
+  userChip: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '4px 10px 4px 6px',
+    borderRadius: 999,
+    background: '#f1f5f9',
+    border: '1px solid #e2e8f0',
+  },
+  chipAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    objectFit: 'cover',
+  },
+  chipMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  chipName: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#0f172a',
+    lineHeight: 1.1,
+  },
+  chipRole: {
+    fontSize: 9.5,
+    fontWeight: 600,
+    color: '#64748b',
+  },
+
+  /* Main Content */
+  mainContent: {
     flex: 1,
-    background: '#edf4fb',
-    overflow: 'hidden',
+    padding: '24px 32px 48px',
   },
-  tabContent: {
-    padding: 22,
+  tabCardWrap: {
+    maxWidth: 1240,
+    margin: '0 auto',
+  },
+
+  /* Section Title Bar */
+  pageTitleBar: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginBottom: 24,
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: 800,
+    color: '#0f172a',
+    letterSpacing: '-0.02em',
+    margin: 0,
+  },
+  pageSub: {
+    fontSize: 13.5,
+    color: '#64748b',
+    marginTop: 4,
   },
   actionRow: {
     display: 'flex',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 10,
   },
-  warningBox: {
-    borderRadius: 14,
-    background: '#fff3d2',
-    border: '1px solid #f0d889',
-    color: '#7c5a00',
-    padding: '14px 16px',
-    fontSize: 14,
-    fontWeight: 600,
-    marginBottom: 20,
+  voucherUploadBtn: {
+    padding: '9px 18px',
+    borderRadius: 9,
+    border: '1.5px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#334155',
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
   },
-  emptyState: {
-    background: '#f5f6fb',
-    border: '1px dashed rgba(26,36,105,0.18)',
-    borderRadius: 16,
-    padding: '22px 18px',
-    color: '#48506d',
-    fontWeight: 600,
+  addAchievementBtn: {
+    padding: '9px 20px',
+    borderRadius: 9,
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    color: '#ffffff',
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.28)',
+  },
+  voucherHintBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    borderRadius: 12,
+    padding: '12px 18px',
+    marginBottom: 20,
+    fontSize: 13,
+    color: '#92400e',
+  },
+  hintIcon: {
+    fontSize: 18,
+    flexShrink: 0,
+  },
+
+  /* Empty State */
+  emptyCard: {
+    background: '#ffffff',
+    border: '1.5px dashed #cbd5e1',
+    borderRadius: 18,
+    padding: '60px 24px',
     textAlign: 'center',
   },
-  achievementList: {
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyHeading: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#0f172a',
+    margin: '0 0 6px',
+  },
+  emptyText: {
+    fontSize: 13.5,
+    color: '#64748b',
+    maxWidth: 420,
+    margin: '0 auto',
+  },
+
+  /* Achievement Cards Grid */
+  achievementGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gap: 18,
+  },
+  achievementCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 16,
+    padding: '20px',
+    boxShadow: '0 4px 12px -2px rgba(15, 23, 42, 0.05)',
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
   },
-  achievementCard: {
-    background: '#f8f9ff',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 16,
-    padding: 16,
-    display: 'flex',
-    gap: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  awardBadge: {
-    background: 'linear-gradient(135deg, #f7e7b1, #d7ad34)',
-    color: '#2a2104',
-    fontWeight: 800,
-    fontSize: 12,
-    padding: '10px 12px',
-    borderRadius: 999,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    minWidth: 110,
-    textAlign: 'center',
-    flexShrink: 0,
-  },
-  achievementInfo: {
-    flex: 1,
-  },
-  achievementTitle: {
-    fontSize: 18,
-    fontWeight: 800,
-    color: '#171c2d',
-    marginBottom: 4,
-  },
-  achievementMeta: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 8,
-    fontSize: 13,
-    color: '#5a647d',
-    fontWeight: 600,
-  },
-  achievementActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  viewBtn: {
-    padding: '8px 14px',
-    borderRadius: 10,
-    border: '1px solid #215b70',
-    background: '#215b70',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 12,
-    cursor: 'pointer',
-  },
-  deleteBtn: {
-    padding: '9px 12px',
-    borderRadius: 10,
-    border: '1px solid rgba(217, 74, 74, 0.35)',
-    background: '#fff',
-    color: '#d94a4a',
-    fontWeight: 700,
-    fontSize: 13,
-    cursor: 'pointer',
-  },
-  certPageHeader: {
+  achievementHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 18,
   },
-  certPageTitle: {
-    margin: 0,
-    fontSize: 22,
+  eventTypeTag: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#64748b',
+    background: '#f1f5f9',
+    padding: '3px 8px',
+    borderRadius: 6,
+  },
+  achievementTitle: {
+    fontSize: 16,
     fontWeight: 800,
-    color: '#171c2d',
+    color: '#0f172a',
+    margin: 0,
+    lineHeight: 1.35,
   },
-  certificateGrid: {
+  achievementMeta: {
+    fontSize: 12.5,
+    color: '#475569',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    lineHeight: 1.4,
+  },
+  achievementFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTop: '1px solid #f1f5f9',
+    marginTop: 'auto',
+  },
+  viewCertBtn: {
+    padding: '7px 14px',
+    borderRadius: 8,
+    border: 'none',
+    background: 'linear-gradient(135deg, #10b981, #059669)',
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  noCertText: {
+    fontSize: 11.5,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  deleteBtn: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid #fecaca',
+    background: '#fff5f5',
+    color: '#dc2626',
+    cursor: 'pointer',
+    fontSize: 13,
+  },
+
+  /* Certificate Grid */
+  certGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    gap: 18,
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gap: 20,
   },
   certCard: {
-    background: '#fff',
-    border: '1px solid rgba(26,36,105,0.1)',
-    borderRadius: 14,
+    background: '#ffffff',
+    borderRadius: 16,
+    border: '1px solid #e2e8f0',
     overflow: 'hidden',
-    boxShadow: '0 8px 20px rgba(20,36,60,0.05)',
+    boxShadow: '0 4px 14px -2px rgba(15, 23, 42, 0.06)',
+    display: 'flex',
+    flexDirection: 'column',
   },
-  certImage: {
+  certImageWrap: {
+    position: 'relative',
+    height: 160,
+    background: '#0f172a',
+    cursor: 'pointer',
+    overflow: 'hidden',
+  },
+  certThumb: {
     width: '100%',
-    height: 140,
+    height: '100%',
     objectFit: 'cover',
-    display: 'block',
-    background: '#eceffa',
-    cursor: 'pointer',
+    transition: 'transform 0.2s ease',
   },
-  certCardBody: {
-    padding: 14,
-    display: 'grid',
-    gap: 8,
-  },
-  certName: {
-    margin: 0,
-    fontSize: 15,
-    fontWeight: 700,
-    color: '#171c2d',
-  },
-  certVerified: {
-    color: '#2d9a72',
-    fontWeight: 700,
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  certActionBtn: {
-    display: 'block',
-    textAlign: 'center',
-    padding: '9px 10px',
-    border: '1px solid #dce4ed',
-    borderRadius: 8,
-    background: '#fff',
-    color: '#3f49a7',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-    textDecoration: 'none',
-  },
-  uploadBtn: {
-    display: 'inline-flex',
+  certHoverOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.45)',
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '12px 20px',
-    borderRadius: 12,
-    background: 'linear-gradient(135deg, #f6c55a, #d9a836)',
-    color: '#171c2d',
-    fontWeight: 800,
-    fontSize: 14,
-    border: 'none',
-    cursor: 'pointer',
-    boxShadow: '0 10px 20px rgba(246, 197, 90, 0.25)',
+    color: '#ffffff',
+    fontSize: 12.5,
+    fontWeight: 700,
+    opacity: 0,
+    transition: 'opacity 0.2s ease',
   },
-  primaryBtn: {
-    padding: '12px 24px',
-    borderRadius: 12,
-    border: 'none',
-    background: 'linear-gradient(135deg, #f6c55a, #d9a836)',
-    color: '#171c2d',
-    fontWeight: 800,
-    fontSize: 14,
-    cursor: 'pointer',
-    boxShadow: '0 10px 20px rgba(246, 197, 90, 0.25)',
+  certCardContent: {
+    padding: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    flex: 1,
   },
-  secondaryBtn: {
-    padding: '12px 24px',
-    borderRadius: 12,
-    border: '2px solid #dbe2f2',
-    background: '#fff',
-    color: '#215b70',
+  certBadgeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  certVerifiedBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#059669',
+    background: '#ecfdf5',
+    padding: '2px 8px',
+    borderRadius: 6,
+    border: '1px solid #a7f3d0',
+  },
+  certTypeBadge: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#b45309',
+    background: '#fef3c7',
+    padding: '2px 8px',
+    borderRadius: 6,
+  },
+  certTitle: {
+    margin: 0,
+    fontSize: 15,
     fontWeight: 800,
-    fontSize: 14,
+    color: '#0f172a',
+    lineHeight: 1.3,
+  },
+  certDate: {
+    margin: 0,
+    fontSize: 12,
+    color: '#64748b',
+  },
+  certActionList: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 12,
+    borderTop: '1px solid #f1f5f9',
+  },
+  certDownloadBtn: {
+    padding: '7px 4px',
+    borderRadius: 7,
+    border: '1px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#334155',
+    fontSize: 11.5,
+    fontWeight: 700,
+    textAlign: 'center',
+    textDecoration: 'none',
+  },
+  certShareBtn: {
+    padding: '7px 4px',
+    borderRadius: 7,
+    border: '1px solid #0077b5',
+    background: '#0077b5',
+    color: '#ffffff',
+    fontSize: 11.5,
+    fontWeight: 700,
     cursor: 'pointer',
   },
+  certCopyBtn: {
+    padding: '7px 4px',
+    borderRadius: 7,
+    border: '1px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#2563eb',
+    fontSize: 11.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+
+  /* Modals */
   modalBackdrop: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.5)',
+    background: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 100,
+    zIndex: 1000,
     padding: 20,
   },
-  formModal: {
+  modalCard: {
     width: '100%',
-    maxWidth: 480,
-    background: '#fff',
+    maxWidth: 520,
+    background: '#ffffff',
     borderRadius: 20,
-    padding: 28,
-    boxShadow: '0 30px 60px rgba(0,0,0,0.25)',
+    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+    border: '1px solid #e2e8f0',
+    overflow: 'hidden',
+    animation: 'scaleUp 0.2s ease',
   },
-  modalTitle: {
-    margin: '0 0 20px',
-    fontSize: 24,
-    fontWeight: 800,
-    color: '#171c2d',
-  },
-  formInput: {
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '12px 14px',
-    borderRadius: 10,
-    border: '1.5px solid rgba(26,36,105,0.12)',
-    fontSize: 14,
-    marginBottom: 12,
-    outline: 'none',
-    background: '#f8f9ff',
-  },
-  formActions: {
-    display: 'flex',
-    gap: 12,
-    marginTop: 20,
-  },
-  settingsCard: {
-    background: '#fff',
-    border: '1px solid rgba(26,36,105,0.08)',
-    borderRadius: 18,
-    padding: 24,
-    maxWidth: 560,
-  },
-  settingsHeader: {
+  modalHeader: {
+    padding: '20px 24px',
+    borderBottom: '1px solid #e2e8f0',
     display: 'flex',
     alignItems: 'center',
-    gap: 16,
-    marginBottom: 18,
+    justifyContent: 'space-between',
+    background: '#f8fafc',
   },
-  settingsAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: '50%',
-    objectFit: 'cover',
-    border: '2px solid #dce4ed',
-  },
-  settingsName: {
+  modalHeading: {
     margin: 0,
-    fontSize: 19,
-    color: '#171c2d',
+    fontSize: 18,
+    fontWeight: 800,
+    color: '#0f172a',
   },
-  settingsSub: {
-    margin: '4px 0 0',
-    fontSize: 13,
-    color: '#697490',
+  modalCloseBtn: {
+    background: 'transparent',
+    border: 'none',
+    fontSize: 18,
+    color: '#64748b',
+    cursor: 'pointer',
   },
-  settingsUploadBtn: {
-    display: 'inline-block',
-    padding: '9px 16px',
+  modalBody: {
+    padding: '20px 24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    maxHeight: '75vh',
+    overflowY: 'auto',
+  },
+  modalLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    marginBottom: -4,
+  },
+  modalInput: {
+    padding: '10px 14px',
+    borderRadius: 9,
+    border: '1.5px solid #cbd5e1',
+    fontSize: 13.5,
+    color: '#0f172a',
+    boxSizing: 'border-box',
+    width: '100%',
+  },
+  modalSelect: {
+    padding: '10px 14px',
+    borderRadius: 9,
+    border: '1.5px solid #cbd5e1',
+    fontSize: 13.5,
+    color: '#0f172a',
+    background: '#ffffff',
+    boxSizing: 'border-box',
+    width: '100%',
+  },
+  modalFileInput: {
+    padding: '8px 10px',
+    borderRadius: 9,
+    border: '1.5px dashed #cbd5e1',
+    background: '#f8fafc',
+    fontSize: 12.5,
+    color: '#475569',
+  },
+  modalGrid2: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #e2e8f0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 12,
+    background: '#f8fafc',
+  },
+  modalSecondaryBtn: {
+    padding: '9px 18px',
     borderRadius: 8,
-    border: '1px solid #dce4ed',
-    background: '#f8f9ff',
-    color: '#3f49a7',
-    fontWeight: 700,
+    border: '1px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#475569',
     fontSize: 13,
-    cursor: 'pointer',
-    marginBottom: 20,
-  },
-  settingsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0,1fr))',
-    gap: 14,
-    marginBottom: 22,
-  },
-  settingsField: {
-    display: 'grid',
-    gap: 4,
-  },
-  settingsFieldLabel: {
-    fontSize: 11,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    color: '#8891a8',
-    fontWeight: 700,
-  },
-  settingsFieldValue: {
-    fontSize: 14,
-    color: '#171c2d',
-  },
-  settingsLogout: {
-    padding: '10px 18px',
-    borderRadius: 10,
-    border: '1px solid rgba(217, 74, 74, 0.35)',
-    background: '#fff',
-    color: '#d94a4a',
-    fontWeight: 700,
-    fontSize: 13,
+    fontWeight: 600,
     cursor: 'pointer',
   },
+  modalPrimaryBtn: {
+    padding: '9px 22px',
+    borderRadius: 8,
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)',
+  },
+}
+
+/* ── SVG Icons ── */
+function DashboardIcon({ active }) {
+  const color = active ? '#60a5fa' : 'currentColor'
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+function TrophyIcon({ active }) {
+  const color = active ? '#60a5fa' : 'currentColor'
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.45 1-1 1H7" />
+      <path d="M14 14.66V17c0 .55.45 1 1 1h2" />
+      <path d="M12 2v10a4 4 0 0 0 4-4V2H8v6a4 4 0 0 0 4 4z" />
+    </svg>
+  )
+}
+
+function CertIcon({ active }) {
+  const color = active ? '#60a5fa' : 'currentColor'
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="6" />
+      <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+    </svg>
+  )
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  )
 }

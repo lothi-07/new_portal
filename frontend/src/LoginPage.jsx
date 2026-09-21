@@ -27,10 +27,10 @@ export default function LoginPage({ onLoggedIn }) {
       const res = await login({ email, password })
       onLoggedIn(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid credentials')
+      setError(err.response?.data?.detail || 'Invalid credentials. Please verify your email and password.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const submitSignup = async (e) => {
@@ -41,7 +41,7 @@ export default function LoginPage({ onLoggedIn }) {
       const res = await signup({ name: signupName, email, password })
       onLoggedIn(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Unable to create account')
+      setError(err.response?.data?.detail || 'Unable to create staff account. Please check your details.')
     } finally {
       setLoading(false)
     }
@@ -52,14 +52,14 @@ export default function LoginPage({ onLoggedIn }) {
     setError('')
     setLoading(true)
     try {
-      const res = await studentLogin(rollNo.trim().toUpperCase(), mobile)
-      // Show welcome screen instead of immediately going to dashboard
+      const res = await studentLogin(rollNo.trim().toUpperCase(), mobile.trim())
       setStudentName(res.data.name || res.data.first_name || 'Student')
       setStudentData({ role: 'student', ...res.data })
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed')
+      setError(err.response?.data?.detail || 'Login failed. Please check your Roll Number and registered Mobile Number.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleStudentWelcomeComplete = () => {
@@ -74,342 +74,779 @@ export default function LoginPage({ onLoggedIn }) {
       const res = await googleLogin(credentialResponse.credential)
       onLoggedIn(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Google login failed')
+      setError(err.response?.data?.detail || 'Google authentication failed.')
     }
   }
 
+  // ── Student Welcome Celebratory Screen ──
   if (loginType === 'student' && studentName) {
     return (
       <div style={s.welcomePage}>
-        <header style={s.welcomeHeader}>
-          <Brand light />
-          <button type="button" style={s.signOutBtn} onClick={() => { setStudentName(''); setStudentData(null) }}>
-            Sign out
+        <div style={s.welcomeCard}>
+          <div style={s.welcomeBadge}>
+            <span style={s.welcomeBadgeIcon}>✓</span>
+            <span>Identity Verified</span>
+          </div>
+
+          <div style={s.trophyWrap}>
+            <div style={s.trophyGlow} />
+            <div style={s.trophyIcon}>🏆</div>
+          </div>
+
+          <div style={s.welcomeEyebrow}>Welcome to ESEC Achievement Portal</div>
+          <h1 style={s.welcomeStudentName}>{studentName}</h1>
+          <p style={s.welcomeSubtext}>
+            Your academic records, participation history, and official certificates are synchronized and ready.
+          </p>
+
+          <div style={s.welcomeMetaRow}>
+            <div style={s.welcomeMetaItem}>
+              <span style={s.welcomeMetaLabel}>Roll No</span>
+              <strong style={s.welcomeMetaValue}>{studentData?.roll_no || rollNo.toUpperCase()}</strong>
+            </div>
+            <div style={s.welcomeMetaDivider} />
+            <div style={s.welcomeMetaItem}>
+              <span style={s.welcomeMetaLabel}>Section</span>
+              <strong style={s.welcomeMetaValue}>{studentData?.year || '—'} Year / {studentData?.section || '—'}</strong>
+            </div>
+            <div style={s.welcomeMetaDivider} />
+            <div style={s.welcomeMetaItem}>
+              <span style={s.welcomeMetaLabel}>Status</span>
+              <strong style={{ ...s.welcomeMetaValue, color: '#10b981' }}>Active Scholar</strong>
+            </div>
+          </div>
+
+          <button style={s.welcomeEnterBtn} onClick={handleStudentWelcomeComplete}>
+            <span>Enter Your Dashboard</span>
+            <span style={s.btnArrow}>→</span>
           </button>
-        </header>
-        <main style={s.welcomeMain}>
-          <p style={s.welcomeEyebrow}>Identity verified - You&apos;re in</p>
-          <h1 style={s.welcomeTitle}>Welcome <span>{studentName}</span></h1>
-          <p style={s.welcomeSubtextNew}>Your achievement trail is ready. Continue to<br />your personal campus noticeboard.</p>
-          <button style={s.welcomeBtnNew} onClick={handleStudentWelcomeComplete}>Enter dashboard &nbsp; -&gt;</button>
-          <div style={s.welcomeFooter}>ESEC STUDENT PORTAL</div>
-        </main>
+
+          <div style={s.welcomeFooterText}>
+            ERODE SENGUNTHAR ENGINEERING COLLEGE (AUTONOMOUS)
+          </div>
+        </div>
       </div>
     )
   }
 
+  // ── Main Split-Screen Login ──
   return (
     <div style={s.page}>
-      <header style={s.header}><Brand /><span style={s.headerHint}>Your achievements, beautifully organized</span></header>
-      <main style={s.loginLayout}>
-        <section style={s.intro}>
-          <div style={s.introPill}>* &nbsp; Your achievements, beautifully organized</div>
-          <h1 style={s.introTitle}>Every milestone<br />has a story.</h1>
-          <p style={s.introText}>Keep your student profile, participation history, certificates, and campus opportunities together in one trusted noticeboard.</p>
-        </section>
+      {/* Top institution banner */}
+      <header style={s.header}>
+        <div style={s.headerBrand}>
+          <div style={s.headerLogo}>ESEC</div>
+          <div>
+            <div style={s.headerTitle}>ERODE SENGUNTHAR ENGINEERING COLLEGE</div>
+            <div style={s.headerSubtitle}>Autonomous Institution • Affiliated to Anna University • Approved by AICTE</div>
+          </div>
+        </div>
+        <div style={s.headerRightTag}>
+          <span style={s.tagDot} />
+          Student Achievement & Records Portal
+        </div>
+      </header>
 
-        <section style={s.loginCard}>
-        <p style={s.cardEyebrow}>{loginType === 'student' ? 'Student sign in' : showSignup ? 'Staff registration' : 'Staff sign in'}</p>
-        <h2 style={s.cardTitle}>{showSignup ? 'Create your account' : 'Welcome back'}</h2>
-        <p style={s.cardSubtitle}>{showSignup ? 'Create a staff account to manage event flyers and view the top students.' : 'Use your campus details to enter the portal.'}</p>
-          <div style={s.loginRoleToggleRow}>
-            <button type="button" onClick={() => { setLoginType('student'); setShowSignup(false); setError('') }} style={{ ...s.loginRoleToggleBtn, ...(loginType === 'student' ? s.loginRoleToggleBtnActive : {}) }}>Student</button>
-            <button type="button" onClick={() => { setLoginType('staff'); setShowSignup(false); setError('') }} style={{ ...s.loginRoleToggleBtn, ...(loginType === 'staff' ? s.loginRoleToggleBtnActive : {}) }}>Staff</button>
+      {/* Main Login Grid */}
+      <main style={s.mainGrid}>
+        {/* Left: Showcase & Value Prop */}
+        <section style={s.showcaseSection}>
+          <div style={s.showcasePill}>
+            <span style={s.pillStar}>★</span>
+            <span>Official Campus Milestone Tracker</span>
           </div>
 
-          {loginType === 'staff' ? (
-            <>
-              {!showSignup && <><div style={s.loginGoogleWrap}><GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('Google login failed')} width="280" /></div>
-              <div style={s.loginDividerRow}><div style={s.loginDividerLine} /><span style={s.loginDividerText}>OR CONTINUE WITH</span><div style={s.loginDividerLine} /></div></>}
-              <form onSubmit={showSignup ? submitSignup : submit}>
-                {showSignup && <><label style={s.loginLabel}>Your name</label><input style={s.loginInput} type="text" value={signupName} onChange={e => setSignupName(e.target.value)} required /></>}
-                <label style={s.loginLabel}>Campus email</label><input style={s.loginInput} type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-                <label style={s.loginLabel}>Password</label><input style={s.loginInput} type="password" value={password} onChange={e => setPassword(e.target.value)} minLength="6" required />
-                {error && <div style={s.loginError}>{error}</div>}
-                <button style={s.loginSubmit} disabled={loading}>{loading ? (showSignup ? 'Creating...' : 'Signing in...') : (showSignup ? 'Create staff account  ->' : 'Sign in to portal  ->')}</button>
+          <h1 style={s.showcaseHeading}>
+            Every milestone <br />
+            <span style={s.highlightHeading}>has a legacy.</span>
+          </h1>
+
+          <p style={s.showcaseDesc}>
+            A centralized, trusted platform to archive student participation in symposiums, hackathons, sports, paper presentations, and co-curricular achievements.
+          </p>
+
+          <div style={s.featureGrid}>
+            <div style={s.featureCard}>
+              <div style={s.featureIcon}>📜</div>
+              <div>
+                <h4 style={s.featureTitle}>Digital Certificates</h4>
+                <p style={s.featureText}>Instant automated certificate generation with verifiable records.</p>
+              </div>
+            </div>
+
+            <div style={s.featureCard}>
+              <div style={s.featureIcon}>⚡</div>
+              <div>
+                <h4 style={s.featureTitle}>Event Flyers & QR Scan</h4>
+                <p style={s.featureText}>Discover upcoming intra & inter-collegiate academic competitions.</p>
+              </div>
+            </div>
+
+            <div style={s.featureCard}>
+              <div style={s.featureIcon}>🏅</div>
+              <div>
+                <h4 style={s.featureTitle}>Prestige Leaderboard</h4>
+                <p style={s.featureText}>Earn XP points, unlock milestone badges, and inspire peers.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Right: Modern Form Card */}
+        <section style={s.formSection}>
+          <div style={s.loginCard}>
+            <div style={s.cardHeader}>
+              <div style={s.cardBadge}>
+                {loginType === 'student' ? 'STUDENT ACCESS' : showSignup ? 'STAFF REGISTRATION' : 'STAFF ACCESS'}
+              </div>
+              <h2 style={s.cardHeading}>
+                {loginType === 'student' ? 'Student Sign In' : showSignup ? 'Create Staff Account' : 'Staff Sign In'}
+              </h2>
+              <p style={s.cardDesc}>
+                {loginType === 'student'
+                  ? 'Enter your institutional Roll Number and registered Mobile Number.'
+                  : showSignup
+                  ? 'Register with your college email to manage events and student records.'
+                  : 'Access the administrative and event management panel.'}
+              </p>
+            </div>
+
+            {/* Role Switcher */}
+            <div style={s.roleSwitcher}>
+              <button
+                type="button"
+                onClick={() => { setLoginType('student'); setShowSignup(false); setError('') }}
+                style={{ ...s.roleBtn, ...(loginType === 'student' ? s.roleBtnActive : {}) }}
+              >
+                🎓 Student Portal
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLoginType('staff'); setShowSignup(false); setError('') }}
+                style={{ ...s.roleBtn, ...(loginType === 'staff' ? s.roleBtnActive : {}) }}
+              >
+                💼 Faculty & Admin
+              </button>
+            </div>
+
+            {/* Form Area */}
+            {loginType === 'student' ? (
+              <form onSubmit={submitStudentLogin} style={s.form}>
+                <div style={s.inputGroup}>
+                  <label style={s.label}>Roll Number</label>
+                  <input
+                    style={s.input}
+                    type="text"
+                    placeholder="e.g. 21CS045"
+                    value={rollNo}
+                    onChange={e => setRollNo(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={s.inputGroup}>
+                  <label style={s.label}>Registered Mobile Number</label>
+                  <input
+                    style={s.input}
+                    type="text"
+                    placeholder="e.g. 9876543210"
+                    value={mobile}
+                    onChange={e => setMobile(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {error && <div style={s.errorAlert}>{error}</div>}
+
+                <button type="submit" style={s.submitBtn} disabled={loading}>
+                  {loading ? 'Authenticating...' : 'Sign in to Student Portal →'}
+                </button>
               </form>
-              {showSignup && <button type="button" style={s.accountLink} onClick={() => { setShowSignup(false); setError('') }}>Already have an account? Sign in</button>}
-            </>
-          ) : (
-            <form onSubmit={submitStudentLogin}>
-              <label style={s.loginLabel}>Roll number</label>
-              <input style={s.loginInput} type="text" placeholder="e.g. ES24AD62" value={rollNo} onChange={e => setRollNo(e.target.value)} required />
-              <label style={s.loginLabel}>Mobile number</label>
-              <input style={s.loginInput} type="text" placeholder="Enter your mobile number" value={mobile} onChange={e => setMobile(e.target.value)} required />
-              {error && <div style={s.loginError}>{error}</div>}
-              <button style={s.loginSubmit} disabled={loading}>{loading ? 'Signing in...' : 'Sign in to portal  ->'}</button>
-            </form>
-          )}
-          {loginType === 'staff' && !showSignup && <p style={s.cardFoot}>New staff member? <button type="button" style={s.accountLink} onClick={() => { setEmail(''); setPassword(''); setSignupName(''); setShowSignup(true); setError('') }}>Create an account</button></p>}
+            ) : (
+              <div>
+                {!showSignup && (
+                  <>
+                    <div style={s.googleWrapper}>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => setError('Google sign in failed')}
+                        theme="outline"
+                        size="large"
+                        width="100%"
+                      />
+                    </div>
+                    <div style={s.divider}>
+                      <div style={s.dividerLine} />
+                      <span style={s.dividerText}>OR SIGN IN WITH PASSWORD</span>
+                      <div style={s.dividerLine} />
+                    </div>
+                  </>
+                )}
+
+                <form onSubmit={showSignup ? submitSignup : submit} style={s.form}>
+                  {showSignup && (
+                    <div style={s.inputGroup}>
+                      <label style={s.label}>Full Name</label>
+                      <input
+                        style={s.input}
+                        type="text"
+                        placeholder="Dr. / Prof. / Mr. Name"
+                        value={signupName}
+                        onChange={e => setSignupName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div style={s.inputGroup}>
+                    <label style={s.label}>Campus Email Address</label>
+                    <input
+                      style={s.input}
+                      type="email"
+                      placeholder="faculty@esec.ac.in"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div style={s.inputGroup}>
+                    <label style={s.label}>Password</label>
+                    <input
+                      style={s.input}
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      minLength={6}
+                      required
+                    />
+                  </div>
+
+                  {error && <div style={s.errorAlert}>{error}</div>}
+
+                  <button type="submit" style={s.submitBtn} disabled={loading}>
+                    {loading
+                      ? (showSignup ? 'Creating Account...' : 'Authenticating...')
+                      : (showSignup ? 'Create Staff Account →' : 'Sign in to Admin Portal →')}
+                  </button>
+                </form>
+
+                <div style={s.cardFooter}>
+                  {showSignup ? (
+                    <p style={s.footerText}>
+                      Already have an account?{' '}
+                      <button
+                        type="button"
+                        style={s.toggleLink}
+                        onClick={() => { setShowSignup(false); setError('') }}
+                      >
+                        Sign In
+                      </button>
+                    </p>
+                  ) : (
+                    <p style={s.footerText}>
+                      Need a new staff account?{' '}
+                      <button
+                        type="button"
+                        style={s.toggleLink}
+                        onClick={() => { setEmail(''); setPassword(''); setSignupName(''); setShowSignup(true); setError('') }}
+                      >
+                        Register
+                      </button>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>
   )
 }
 
-function Brand({ light = false }) {
-  return (
-    <div style={light ? s.welcomeBrand : s.brand}>
-      <div style={light ? s.welcomeLogoCircle : s.loginLogoCircle}>ES</div>
-      <div>
-        <div style={light ? s.welcomeBrandName : s.brandName}>Achievement Portal</div>
-        <div style={light ? s.welcomeBrandSub : s.brandSub}>ERODE SENGUNTHAR ENGINEERING COLLEGE</div>
-      </div>
-    </div>
-  )
-}
-
+/* ── Modern Styles ── */
 const s = {
   page: {
     minHeight: '100vh',
+    background: '#0b132b',
+    backgroundImage: `
+      radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.18) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.12) 0%, transparent 40%),
+      linear-gradient(180deg, #0b132b 0%, #0f172a 100%)
+    `,
+    color: '#f8fafc',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
-    background: 'linear-gradient(135deg, #f7f0df 0%, #fffaf0 55%, #f5ead8 100%)',
-    fontFamily: "'Inter', 'Poppins', sans-serif",
+    fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
   },
-  card: {
-    background: 'rgba(38, 37, 134, 0.68)',
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
-    border: '1px solid rgba(255, 255, 255, 0.18)',
-    borderRadius: 24,
-    padding: '40px 44px',
-    width: 380,
-    boxShadow: '0 25px 60px rgba(10, 6, 22, 0.4), inset 0 1px 0 rgba(255,255,255,0.08)',
-    animation: 'fadeIn 0.5s ease',
-    transform: 'perspective(1000px) rotateX(1deg)',
-    transition: 'transform 0.4s ease, box-shadow 0.4s ease',
-  },
-  logoWrap: {
+  header: {
+    height: 76,
+    padding: '0 40px',
     display: 'flex',
-    justifyContent: 'center',
-    marginBottom: 18,
-    transform: 'translateZ(20px)',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'rgba(15, 23, 42, 0.7)',
+    backdropFilter: 'blur(10px)',
   },
-  logoCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: '50%',
-    border: '2.5px solid #f6c55a',
-    background: 'rgba(255,255,255,0.08)',
+  headerBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+  },
+  headerLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+    border: '1px solid rgba(255, 255, 255, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 10px 20px -5px rgba(246,197,90,0.4)',
-  },
-  logoText: {
     fontWeight: 800,
     fontSize: 13,
-    color: '#f6c55a',
+    color: '#ffffff',
     letterSpacing: 0.5,
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
   },
-  title: {
-    textAlign: 'center',
-    fontSize: 20,
+  headerTitle: {
+    fontSize: 13,
     fontWeight: 800,
-    color: '#f2f6ff',
-    marginBottom: 8,
-    transform: 'translateZ(10px)',
+    color: '#ffffff',
+    letterSpacing: '0.04em',
   },
-  titleUnderline: {
-    width: 40,
-    height: 2.5,
-    background: '#f6c55a',
-    borderRadius: 2,
-    margin: '0 auto 12px',
-    boxShadow: '0 2px 4px rgba(246, 197, 90, 0.5)',
+  headerSubtitle: {
+    fontSize: 10,
+    fontWeight: 500,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 2,
   },
-  subtitle: {
-    textAlign: 'center',
-    fontSize: 10.5,
+  headerRightTag: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: 999,
+    padding: '6px 14px',
+    fontSize: 11.5,
+    color: '#93c5fd',
     fontWeight: 600,
-    color: '#e5ebff',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+  },
+  tagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#38bdf8',
+    boxShadow: '0 0 8px #38bdf8',
+  },
+
+  /* Main Grid */
+  mainGrid: {
+    flex: 1,
+    maxWidth: 1240,
+    width: '100%',
+    margin: '0 auto',
+    padding: '40px 28px 60px',
+    display: 'grid',
+    gridTemplateColumns: '1.15fr 460px',
+    gap: 56,
+    alignItems: 'center',
+  },
+
+  /* Left Showcase */
+  showcaseSection: {
+    paddingRight: 10,
+  },
+  showcasePill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '6px 14px',
+    borderRadius: 999,
+    background: 'rgba(37, 99, 235, 0.15)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
+    color: '#60a5fa',
+    fontSize: 12,
+    fontWeight: 700,
     marginBottom: 24,
   },
-  roleToggleRow: {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 20,
-    background: 'rgba(255,255,255,0.08)',
-    borderRadius: 9,
-    padding: 4,
-    border: '1px solid rgba(255,255,255,0.1)',
+  pillStar: {
+    color: '#fbbf24',
+    fontSize: 13,
   },
-  roleToggleBtn: {
+  showcaseHeading: {
+    fontSize: 'clamp(2.5rem, 4.5vw, 3.8rem)',
+    fontWeight: 800,
+    color: '#ffffff',
+    lineHeight: 1.12,
+    letterSpacing: '-0.03em',
+    margin: '0 0 20px',
+  },
+  highlightHeading: {
+    background: 'linear-gradient(135deg, #60a5fa 0%, #38bdf8 50%, #f59e0b 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  showcaseDesc: {
+    fontSize: 15.5,
+    color: '#94a3b8',
+    lineHeight: 1.7,
+    maxWidth: 540,
+    margin: '0 0 36px',
+  },
+  featureGrid: {
+    display: 'grid',
+    gap: 14,
+    maxWidth: 520,
+  },
+  featureCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: '14px 18px',
+    borderRadius: 14,
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    transition: 'transform 0.2s ease, background 0.2s ease',
+  },
+  featureIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    background: 'rgba(37, 99, 235, 0.15)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 20,
+    flexShrink: 0,
+  },
+  featureTitle: {
+    margin: '0 0 2px',
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#f8fafc',
+  },
+  featureText: {
+    margin: 0,
+    fontSize: 12.5,
+    color: '#94a3b8',
+    lineHeight: 1.4,
+  },
+
+  /* Right Form Section */
+  formSection: {
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  loginCard: {
+    width: '100%',
+    background: '#ffffff',
+    color: '#0f172a',
+    borderRadius: 22,
+    padding: '34px 32px',
+    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+  },
+  cardHeader: {
+    marginBottom: 20,
+  },
+  cardBadge: {
+    display: 'inline-block',
+    fontSize: 10.5,
+    fontWeight: 800,
+    color: '#2563eb',
+    background: '#eff6ff',
+    padding: '4px 10px',
+    borderRadius: 6,
+    letterSpacing: '0.06em',
+    marginBottom: 8,
+  },
+  cardHeading: {
+    fontSize: 22,
+    fontWeight: 800,
+    color: '#0f172a',
+    letterSpacing: '-0.02em',
+    margin: '0 0 6px',
+  },
+  cardDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 1.45,
+    margin: 0,
+  },
+
+  /* Role Switcher */
+  roleSwitcher: {
+    display: 'flex',
+    gap: 6,
+    background: '#f1f5f9',
+    padding: 4,
+    borderRadius: 10,
+    marginBottom: 22,
+    border: '1px solid #e2e8f0',
+  },
+  roleBtn: {
     flex: 1,
-    padding: '8px 0',
+    padding: '9px 0',
     border: 'none',
     background: 'transparent',
-    borderRadius: 7,
-    fontWeight: 700,
+    borderRadius: 8,
+    color: '#64748b',
     fontSize: 12.5,
-    color: '#dbe2f2',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
   },
-  roleToggleBtnActive: {
-    background: 'rgba(255,255,255,0.92)',
-    color: '#063e4b',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+  roleBtnActive: {
+    background: '#ffffff',
+    color: '#0f172a',
+    fontWeight: 700,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
   },
-  googleWrap: {
-    marginBottom: 18,
-    transform: 'translateZ(15px)',
+
+  /* Form */
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
   },
-  dividerRow: {
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  label: {
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: '#334155',
+  },
+  input: {
+    padding: '11px 14px',
+    borderRadius: 10,
+    border: '1.5px solid #cbd5e1',
+    background: '#f8fafc',
+    color: '#0f172a',
+    fontSize: 13.5,
+    outline: 'none',
+    boxSizing: 'border-box',
+    width: '100%',
+  },
+  submitBtn: {
+    marginTop: 4,
+    padding: '12px 18px',
+    borderRadius: 10,
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 700,
+    letterSpacing: '0.01em',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  },
+  errorAlert: {
+    padding: '10px 14px',
+    borderRadius: 8,
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    fontSize: 12.5,
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+  googleWrapper: {
+    marginBottom: 16,
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  divider: {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 20,
+    margin: '18px 0',
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    background: 'rgba(0,0,0,0.1)',
+    background: '#e2e8f0',
   },
   dividerText: {
-    fontSize: 11.5,
-    color: '#dfe8ff',
-    whiteSpace: 'nowrap',
-    fontWeight: 600,
+    fontSize: 10.5,
+    fontWeight: 700,
+    color: '#94a3b8',
+    letterSpacing: '0.06em',
   },
-  label: {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#edf3ff',
-    marginBottom: 6,
-  },
-  input: {
-    width: '100%',
-    padding: '10px 13px',
-    marginBottom: 16,
-    borderRadius: 10,
-    border: '1.5px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.08)',
-    color: '#fff',
-    fontSize: 13.5,
-    outline: 'none',
-    transition: 'all 0.2s ease',
-    display: 'block',
-    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)',
-  },
-  loginBtn: {
-    width: '100%',
-    padding: '12px 0',
-    background: 'linear-gradient(135deg, #f6c55a, #d9a836)',
-    color: '#171c2d',
-    border: 'none',
-    borderRadius: 10,
-    fontWeight: 800,
-    fontSize: 14.5,
-    marginTop: 4,
-    letterSpacing: 0.3,
-    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    boxShadow: '0 10px 18px rgba(246, 197, 90, 0.28)',
-  },
-  error: {
-    color: '#ffd7d7',
-    fontSize: 12.5,
-    marginBottom: 10,
+  cardFooter: {
+    marginTop: 18,
     textAlign: 'center',
-    fontWeight: 600,
-    background: 'rgba(150, 30, 30, 0.32)',
-    padding: 6,
-    borderRadius: 6,
-    border: '1px solid rgba(255,255,255,0.08)',
   },
-  welcomeScreen: {
+  footerText: {
+    margin: 0,
+    fontSize: 12.5,
+    color: '#64748b',
+  },
+  toggleLink: {
+    background: 'transparent',
+    border: 'none',
+    color: '#2563eb',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontSize: 'inherit',
+    padding: 0,
+    textDecoration: 'underline',
+  },
+
+  /* Welcome Screen */
+  welcomePage: {
+    minHeight: '100vh',
+    background: '#0b132b',
+    backgroundImage: `
+      radial-gradient(circle at 50% 30%, rgba(37, 99, 235, 0.25) 0%, transparent 60%),
+      radial-gradient(circle at 80% 80%, rgba(245, 158, 11, 0.15) 0%, transparent 50%),
+      linear-gradient(180deg, #0b132b 0%, #0f172a 100%)
+    `,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 300,
+    padding: 24,
+    fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
   },
-  welcomeContent: {
+  welcomeCard: {
+    width: '100%',
+    maxWidth: 580,
+    background: 'rgba(15, 23, 42, 0.85)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    borderRadius: 28,
+    padding: '44px 40px',
+    boxShadow: '0 30px 70px rgba(0, 0, 0, 0.5)',
     textAlign: 'center',
+    animation: 'scaleUp 0.3s ease',
   },
-  welcomeGreeting: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.7)',
-    margin: 0,
-    fontWeight: 600,
-    letterSpacing: 0.5,
+  welcomeBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    background: 'rgba(16, 185, 129, 0.15)',
+    border: '1px solid rgba(16, 185, 129, 0.35)',
+    borderRadius: 999,
+    padding: '6px 16px',
+    color: '#34d399',
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    marginBottom: 24,
   },
-  welcomeName: {
-    fontSize: 48,
+  welcomeBadgeIcon: {
+    fontWeight: 900,
+  },
+  trophyWrap: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  trophyGlow: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(245, 158, 11, 0.4) 0%, transparent 70%)',
+    animation: 'pulseGlow 3s infinite ease-in-out',
+  },
+  trophyIcon: {
+    fontSize: 54,
+    position: 'relative',
+    zIndex: 2,
+  },
+  welcomeEyebrow: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#93c5fd',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  welcomeStudentName: {
+    fontSize: 'clamp(2rem, 4vw, 2.8rem)',
     fontWeight: 800,
-    color: '#fff',
-    margin: '16px 0',
-    letterSpacing: '-0.02em',
+    color: '#ffffff',
+    letterSpacing: '-0.025em',
+    margin: '0 0 14px',
   },
   welcomeSubtext: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.6)',
-    margin: '12px 0 28px',
-    fontWeight: 500,
+    fontSize: 14.5,
+    color: '#94a3b8',
+    lineHeight: 1.6,
+    maxWidth: 440,
+    margin: '0 auto 28px',
   },
-  welcomeBtn: {
-    padding: '14px 40px',
-    background: 'linear-gradient(135deg, #f6c55a, #d9a836)',
-    color: '#171c2d',
-    border: 'none',
+  welcomeMetaRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    padding: '14px 20px',
+    marginBottom: 30,
+  },
+  welcomeMetaItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  welcomeMetaLabel: {
+    fontSize: 10.5,
+    fontWeight: 700,
+    color: '#64748b',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  welcomeMetaValue: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#f8fafc',
+  },
+  welcomeMetaDivider: {
+    width: 1,
+    height: 28,
+    background: 'rgba(255, 255, 255, 0.1)',
+  },
+  welcomeEnterBtn: {
+    width: '100%',
+    padding: '14px 24px',
     borderRadius: 12,
-    fontWeight: 800,
-    fontSize: 16,
+    border: 'none',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: '0.01em',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     cursor: 'pointer',
-    letterSpacing: 0.3,
-    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    boxShadow: '0 12px 24px rgba(246, 197, 90, 0.3)',
+    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
   },
-  header: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 94, padding: '0 max(28px, calc((100% - 1240px) / 2))',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e6dece',
-    background: 'rgba(255, 250, 237, 0.82)', zIndex: 2,
+  btnArrow: {
+    fontSize: 18,
+    fontWeight: 700,
+    transition: 'transform 0.15s ease',
   },
-  brand: { display: 'flex', alignItems: 'center', gap: 12 },
-  welcomeBrand: { display: 'flex', alignItems: 'center', gap: 12, color: '#fff' },
-  brandName: { color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700 },
-  welcomeBrandName: { color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700 },
-  brandSub: { color: '#0d4d5d', fontSize: 9, letterSpacing: '0.2em', marginTop: 4 },
-  welcomeBrandSub: { color: '#d9f3f7', fontSize: 9, letterSpacing: '0.2em', marginTop: 4 },
-  headerHint: { color: '#78949a', fontSize: 12 },
-  loginLayout: { width: '100%', maxWidth: 1240, margin: '94px auto 0', padding: '70px 28px', display: 'grid', gridTemplateColumns: '1fr 440px', gap: 80, alignItems: 'center' },
-  intro: { paddingBottom: 22 },
-  introPill: { display: 'inline-block', padding: '7px 14px', borderRadius: 999, color: '#0d4d5d', background: 'rgba(13, 77, 93, 0.08)', fontSize: 11, fontWeight: 700 },
-  introTitle: { margin: '32px 0 22px', color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 'clamp(3rem, 6vw, 5rem)', lineHeight: 0.98, letterSpacing: '-0.06em' },
-  introText: { maxWidth: 520, color: '#52727a', fontSize: 16, lineHeight: 1.75 },
-  introPoints: { display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 34, color: '#39727a', fontSize: 12 },
-  loginCard: { width: '100%', padding: 32, borderRadius: 24, background: '#fffdf8', border: '1px solid #e4dccd', boxShadow: '0 18px 45px rgba(23,62,62,0.11)' },
-  cardEyebrow: { margin: 0, color: '#0d4d5d', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 800 },
-  cardTitle: { margin: '12px 0 8px', color: '#0d4d5d', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 30 },
-  cardSubtitle: { margin: 0, color: '#78949a', fontSize: 13, lineHeight: 1.5 },
-  loginLogoCircle: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 15, background: '#0d4d5d', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 17, fontWeight: 800 },
-  welcomeLogoCircle: { width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: '#0d4d5d', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 17, fontWeight: 800 },
-  loginRoleToggleRow: { margin: '22px 0', padding: 4, display: 'flex', gap: 4, borderRadius: 10, background: '#f4efe4' },
-  loginRoleToggleBtn: { flex: 1, padding: '9px 0', border: 0, borderRadius: 7, background: 'transparent', color: '#78949a', fontSize: 12, fontWeight: 700 },
-  loginRoleToggleBtnActive: { background: '#0d4d5d', color: '#fff' },
-  loginGoogleWrap: { display: 'flex', justifyContent: 'center', margin: '18px 0' },
-  loginDividerRow: { display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0', color: '#a3b4b5' },
-  loginDividerLine: { flex: 1, height: 1, background: '#e0e4dc' },
-  loginDividerText: { fontSize: 9, letterSpacing: '0.15em', whiteSpace: 'nowrap' },
-  loginLabel: { display: 'block', margin: '0 0 7px', color: '#426770', fontSize: 11, fontWeight: 700 },
-  loginInput: { width: '100%', padding: '13px 14px', marginBottom: 16, border: '1px solid #dce2d9', borderRadius: 10, background: '#fffefa', color: '#0d4d5d', fontSize: 13, outline: 'none' },
-  loginSubmit: { width: '100%', padding: '13px 16px', border: 0, borderRadius: 10, background: '#0d4d5d', color: '#fff', fontSize: 13, fontWeight: 700 },
-  loginError: { marginBottom: 12, padding: 8, borderRadius: 8, color: '#a33d3d', background: '#fff0ed', fontSize: 12, textAlign: 'center' },
-  cardFoot: { margin: '20px 0 0', color: '#78949a', fontSize: 11, textAlign: 'center' },
-  accountLink: { border: 0, padding: 0, background: 'transparent', color: '#0d6878', fontWeight: 700, cursor: 'pointer', fontSize: 'inherit' },
-  'cardFoot span': { color: '#0d4d5d', fontWeight: 700 },
-  welcomePage: { minHeight: '100vh', color: '#fff', background: 'linear-gradient(135deg, #0d4d5d 0%, #0f5b67 100%)' },
-  welcomeHeader: { height: 94, padding: '0 max(28px, calc((100% - 1240px) / 2))', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  signOutBtn: { padding: '9px 18px', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999, background: 'transparent', color: '#fff', fontSize: 12, fontWeight: 600 },
-  welcomeMain: { minHeight: 'calc(100vh - 94px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '30px 20px 70px' },
-  checkCircle: { width: 72, height: 72, display: 'grid', placeItems: 'center', marginBottom: 28, border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, background: '#0b5b69', color: '#fff', fontSize: 36, fontWeight: 700 },
-  welcomeEyebrow: { margin: 0, color: '#d7f3f7', fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', fontWeight: 700 },
-  welcomeTitle: { margin: '26px 0 22px', color: '#fff', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 'clamp(4rem, 9vw, 12rem)', lineHeight: 0.88, letterSpacing: '-0.06em' },
-  'welcomeTitle span': { display: 'inline-block', padding: '0.02em 0.22em', borderRadius: 14, background: '#0c5f7e', color: '#fff', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.12)' },
-  welcomeSubtextNew: { margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 1.9 },
-  welcomeBtnNew: { marginTop: 34, padding: '14px 28px', border: 0, borderRadius: 999, background: '#f5f1ea', color: '#0d4d5d', fontSize: 13, fontWeight: 700 },
-  welcomeFooter: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.45)', fontSize: 9, letterSpacing: '0.35em' },
+  welcomeFooterText: {
+    marginTop: 22,
+    fontSize: 10,
+    fontWeight: 700,
+    color: 'rgba(255, 255, 255, 0.35)',
+    letterSpacing: '0.1em',
+  },
 }

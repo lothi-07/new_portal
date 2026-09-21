@@ -1,64 +1,268 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-navy: #0f172a;
+  --color-navy-card: #1e293b;
+  --color-gold: #f59e0b;
+  --color-gold-light: #fef3c7;
+  --color-emerald: #10b981;
+  --color-emerald-light: #ecfdf5;
+  --color-rose: #ef4444;
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100%;
+}
 
 body {
   margin: 0;
-  background: #f0ece2;
-  color: #1e1e2e;
-  font-family: 'Inter', 'Poppins', Arial, sans-serif;
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-800);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: #c9c9d6; border-radius: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-400);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-button { font-family: inherit; cursor: pointer; }
-input, select { font-family: inherit; }
+/* Base Typography & Inputs */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  outline: none;
+}
 
+input, select, textarea {
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--color-slate-800);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Animation Keyframes */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-10px); }
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* 3D button effects */
-button {
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease !important;
-  will-change: transform;
-}
-button:hover:not(:disabled) {
-  transform: translateY(-2px) scale(1.02) !important;
-  box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.2) !important;
-}
-button:active:not(:disabled) {
-  transform: translateY(1px) scale(0.98) !important;
-  box-shadow: 0 2px 5px -2px rgba(0, 0, 0, 0.3) !important;
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-/* Table rows 3D effect */
-tbody tr {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-tbody tr:hover {
-  transform: scale(1.01) translateZ(10px);
-  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
-  background-color: #ffffff;
-  position: relative;
-  z-index: 10;
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.05); }
 }
 
-/* 3D App Cards */
+/* Modern Card Hover */
 .app-card {
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
-  will-change: transform;
-  transform-style: preserve-3d;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .app-card:hover {
-  transform: translateY(-4px) rotateX(1deg) rotateY(-1deg);
-  box-shadow: 10px 20px 30px -10px rgba(0,0,0,0.15) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Table styling utilities */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Badges & Status */
+.badge-gold {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.badge-blue {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-green {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+/* Mentor management remains usable on tablet and phone widths. */
+.mentors-card {
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .mentors-page .mentors-bulk-bar {
+    align-items: stretch !important;
+  }
+
+  .mentors-page .mentors-bulk-bar > * {
+    flex: 1 1 180px;
+  }
+
+  .mentors-page .mentors-bulk-bar > span {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .mentors-page .mentors-filters {
+    flex-wrap: wrap;
+  }
+
+  .mentors-page .mentors-filters select {
+    flex: 1 1 180px;
+  }
+
+  .mentors-page .mentors-filters span {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-layout .sidebar {
+    width: 72px !important;
+    min-width: 72px !important;
+  }
+
+  .app-layout .brand {
+    justify-content: center !important;
+    padding: 16px 8px !important;
+  }
+
+  .app-layout .brand-details,
+  .app-layout .nav-label,
+  .app-layout .nav-section-label,
+  .app-layout .active-dot,
+  .app-layout .sidebar-user-info,
+  .app-layout .logout-btn span {
+    display: none !important;
+  }
+
+  .app-layout .nav {
+    padding: 10px 8px !important;
+  }
+
+  .app-layout .nav-btn {
+    justify-content: center !important;
+    padding: 11px 8px !important;
+  }
+
+  .app-layout .sidebar-footer {
+    padding: 10px 8px !important;
+  }
+
+  .app-layout .sidebar-user-chip,
+  .app-layout .logout-btn {
+    justify-content: center !important;
+  }
+
+  .app-layout .top-bar {
+    padding: 0 14px !important;
+  }
+
+  .app-layout .breadcrumb-muted,
+  .app-layout .breadcrumb-slash,
+  .app-layout .user-email-text,
+  .app-layout .header-logout-btn {
+    display: none !important;
+  }
+
+  .app-layout .main {
+    padding: 18px 12px 32px !important;
+  }
+
+  .mentors-page .mentors-bulk-bar {
+    flex-direction: column;
+  }
+
+  .mentors-page .mentors-bulk-bar > *,
+  .mentors-page .mentors-bulk-bar > span {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .mentors-page .mentors-bulk-bar > span {
+    text-align: center;
+  }
+
+  .mentors-page .mentors-card {
+    padding: 12px !important;
+    overflow-x: auto;
+  }
+
+  .mentors-page .mentors-card table {
+    min-width: 760px;
+  }
+
+  .mentors-page .mentors-card th,
+  .mentors-page .mentors-card td {
+    padding: 10px 9px !important;
+  }
+
+  .mentors-page .mentorActions {
+    min-width: 330px !important;
+  }
 }

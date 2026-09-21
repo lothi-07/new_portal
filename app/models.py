@@ -81,6 +81,7 @@ class Student(Base):
     department = Column(String, default="AI & DS", index=True)
     section = Column(String, nullable=False, index=True)     # A / B / C
     photo_path = Column(String, nullable=True)
+    mentor_id = Column(Integer, ForeignKey("staff_users.id"), nullable=True, index=True)
     
     # Gamification fields
     total_points = Column(Integer, default=0, index=True)      # XP points earned
@@ -90,6 +91,7 @@ class Student(Base):
 
     achievements = relationship("Achievement", back_populates="student", cascade="all, delete-orphan")
     badges = relationship("StudentBadge", back_populates="student", cascade="all, delete-orphan")
+    mentor = relationship("StaffUser", foreign_keys=[mentor_id])
 
 
 class Achievement(Base):

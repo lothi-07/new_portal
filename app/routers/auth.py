@@ -101,6 +101,9 @@ def student_login(body: dict, db: Session = Depends(get_db)):
         "year": student.year,
         "department": student.department,
         "mobile_number": student.mobile_number,
+        "mentor_id": student.mentor_id,
+        "mentor_name": student.mentor.name if student.mentor else None,
+        "mentor_email": student.mentor.email if student.mentor else None,
         "role": "student",
     }
 
