@@ -50,7 +50,14 @@ class EventRegistration(Base):
     id = Column(Integer, primary_key=True, index=True)
     flyer_id = Column(Integer, ForeignKey("event_flyers.id"), nullable=False, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    full_name = Column(String, nullable=True)
     email = Column(String, nullable=False)
+    roll_no = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    year = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    section = Column(String, nullable=True)
+    submission_note = Column(String, nullable=True)
     registered_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     registration_screenshot_path = Column(String, nullable=True)
     verification_status = Column(String, default="pending", nullable=False)
@@ -61,6 +68,30 @@ class EventRegistration(Base):
     certificate_uploaded_at = Column(DateTime(timezone=True), nullable=True)
     reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
     flyer = relationship("EventFlyer", back_populates="registrations")
+    student = relationship("Student")
+
+
+class ODSubmission(Base):
+    __tablename__ = "od_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False, index=True)
+    student_name = Column(String, nullable=False)
+    register_number = Column(String, nullable=False)
+    department = Column(String, nullable=True)
+    year_section = Column(String, nullable=True)
+    od_date = Column(String, nullable=False)
+    total_days = Column(Integer, nullable=False, default=1)
+    student_mobile = Column(String, nullable=True)
+    parent_mobile = Column(String, nullable=True)
+    purpose = Column(String, nullable=False)
+    document_path = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending")
+    rejection_reason = Column(String, nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    reviewed_by = Column(String, nullable=True)
+    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
     student = relationship("Student")
 
 

@@ -15,6 +15,10 @@ class AchievementCreate(AchievementBase):
     student_id: int
 
 
+class BulkAchievementCreate(AchievementBase):
+    student_ids: List[int]
+
+
 class AchievementOut(AchievementBase):
     id: int
     student_id: int

@@ -23,12 +23,32 @@ def register_for_event(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_student),
     screenshot: UploadFile | None = File(None),
+    full_name: str | None = Form(None),
+    email: str | None = Form(None),
+    roll_no: str | None = Form(None),
+    phone: str | None = Form(None),
+    year: str | None = Form(None),
+    department: str | None = Form(None),
+    section: str | None = Form(None),
+    submission_note: str | None = Form(None),
 ):
     student_id = user.get("student_id")
     flyer = db.query(models.EventFlyer).filter(models.EventFlyer.id == flyer_id).first()
     student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not flyer or not student:
         raise HTTPException(status_code=404, detail="Event or student not found")
+
+    resolved_full_name = (full_name or student.first_name + (" " + (student.last_name or "") if student.last_name else "")).strip()
+    resolved_email = (email or student.email or "").strip()
+    resolved_roll_no = (roll_no or student.roll_no or "").strip()
+    resolved_phone = (phone or student.mobile_number or "").strip()
+    resolved_year = (year or student.year or "").strip()
+    resolved_department = (department or student.department or "").strip()
+    resolved_section = (section or student.section or "").strip()
+
+    if not resolved_email:
+        raise HTTPException(status_code=400, detail="Add an email address to your student profile first")
+
     existing = db.query(models.EventRegistration).filter(
         models.EventRegistration.flyer_id == flyer_id,
         models.EventRegistration.student_id == student_id,
@@ -36,19 +56,36 @@ def register_for_event(
     if existing:
         if screenshot and not existing.registration_screenshot_path:
             existing.registration_screenshot_path = _save_upload(screenshot)
-            db.commit()
+        existing.full_name = resolved_full_name
+        existing.email = resolved_email
+        existing.roll_no = resolved_roll_no
+        existing.phone = resolved_phone
+        existing.year = resolved_year
+        existing.department = resolved_department
+        existing.section = resolved_section
+        existing.submission_note = submission_note.strip() if submission_note else existing.submission_note
+        existing.verification_status = existing.verification_status or "pending"
+        db.commit()
         return {"id": existing.id, "message": "Registration already recorded", "status": existing.verification_status}
-    if not student.email:
-        raise HTTPException(status_code=400, detail="Add an email address to your student profile first")
+
     registration = models.EventRegistration(
-        flyer_id=flyer_id, student_id=student_id, email=student.email
+        flyer_id=flyer_id,
+        student_id=student_id,
+        full_name=resolved_full_name,
+        email=resolved_email,
+        roll_no=resolved_roll_no,
+        phone=resolved_phone,
+        year=resolved_year,
+        department=resolved_department,
+        section=resolved_section,
+        submission_note=submission_note.strip() if submission_note else None,
     )
     if screenshot:
         registration.registration_screenshot_path = _save_upload(screenshot)
     db.add(registration)
     db.commit()
     db.refresh(registration)
-    return {"id": registration.id, "message": "Registration recorded"}
+    return {"id": registration.id, "message": "Registration recorded", "status": registration.verification_status}
 
 
 def _save_upload(upload: UploadFile) -> str:
@@ -124,7 +161,14 @@ def _registration_json(registration: models.EventRegistration, include_student: 
         "event_title": registration.flyer.title if registration.flyer else None,
         "event_date": registration.flyer.event_date if registration.flyer else None,
         "event_end_date": registration.flyer.event_end_date if registration.flyer else None,
+        "full_name": registration.full_name or (f"{registration.student.first_name} {registration.student.last_name or ''}".strip() if registration.student else None),
         "email": registration.email,
+        "roll_no": registration.roll_no or (registration.student.roll_no if registration.student else None),
+        "phone": registration.phone,
+        "year": registration.year or (registration.student.year if registration.student else None),
+        "department": registration.department or (registration.student.department if registration.student else None),
+        "section": registration.section or (registration.student.section if registration.student else None),
+        "submission_note": registration.submission_note,
         "registered_at": registration.registered_at,
         "registration_screenshot_path": registration.registration_screenshot_path,
         "verification_status": registration.verification_status,
@@ -136,8 +180,9 @@ def _registration_json(registration: models.EventRegistration, include_student: 
         result.update({
             "student_id": registration.student.id,
             "student_name": f"{registration.student.first_name} {registration.student.last_name or ''}".strip(),
-            "roll_no": registration.student.roll_no,
         })
+    else:
+        result["student_name"] = result["full_name"] or (f"{registration.student.first_name} {registration.student.last_name or ''}".strip() if registration.student else None)
     return result
 
 

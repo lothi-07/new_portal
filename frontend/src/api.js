@@ -47,6 +47,7 @@ export const exportSingleStudentUrl = (id) => `${API_URL}/students/${id}/export`
 // ---- Achievements ----
 export const listAchievements = (params) => api.get('/achievements/', { params })
 export const createAchievement = (data) => api.post('/achievements/', data)
+export const createBulkAchievement = (data) => api.post('/achievements/bulk', data)
 export const uploadCertificate = (formData) =>
   api.post('/achievements/upload-certificate', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteAchievement = (id) => api.delete(`/achievements/${id}`)
@@ -77,9 +78,18 @@ export const listEventFlyers = () => api.get('/event-flyers/')
 export const uploadEventFlyer = (formData) =>
   api.post('/event-flyers/', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteEventFlyer = (id) => api.delete(`/event-flyers/${id}`)
-export const registerForEvent = (flyerId, screenshot) => {
+export const registerForEvent = (flyerId, payload = {}) => {
   const data = new FormData()
-  if (screenshot) data.append('screenshot', screenshot)
+  const screenshot = payload.screenshot ?? payload
+  if (screenshot instanceof File || screenshot instanceof Blob) data.append('screenshot', screenshot)
+  if (payload.full_name || payload.name) data.append('full_name', payload.full_name || payload.name || '')
+  if (payload.email) data.append('email', payload.email)
+  if (payload.roll_no) data.append('roll_no', payload.roll_no)
+  if (payload.phone) data.append('phone', payload.phone)
+  if (payload.year) data.append('year', payload.year)
+  if (payload.department) data.append('department', payload.department)
+  if (payload.section) data.append('section', payload.section)
+  if (payload.submission_note) data.append('submission_note', payload.submission_note)
   return api.post(`/registrations/${flyerId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 export const getMyRegistrations = () => api.get('/registrations/mine')
@@ -123,3 +133,18 @@ export default api
 export const deleteStudentsByClass = (year, section) =>
   api.delete('/students/bulk/by-class', { params: { year, section } })
 export const studentLogin = (roll_no, mobile) => api.post('/auth/student-login', { roll_no, mobile})
+export const createODSubmission = (payload) => {
+  const data = new FormData()
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') data.append(key, value)
+  })
+  return api.post('/od-submissions/', data, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const getMyODSubmissions = () => api.get('/od-submissions/mine')
+export const getODSubmissions = () => api.get('/od-submissions/')
+export const reviewODSubmission = (id, approved, rejection_reason = '') => {
+  const data = new FormData()
+  data.append('approved', String(approved))
+  if (rejection_reason) data.append('rejection_reason', rejection_reason)
+  return api.post(`/od-submissions/${id}/review`, data)
+}

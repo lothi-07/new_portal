@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   searchStudents, getStudent, createStudent, deleteStudent, uploadStudentPhoto,
-  createAchievement, uploadCertificate, generateOutput, deleteAchievement,
+  createAchievement, createBulkAchievement, uploadCertificate, generateOutput, deleteAchievement,
   exportStudentsUrl, exportSingleStudentUrl, API_BASE, deleteStudentsByClass,
   listEventFlyers, photoUrl,
 } from '../api'
@@ -21,6 +21,7 @@ export default function StudentsTab({ focusStudentId = null }) {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showAddAchievement, setShowAddAchievement] = useState(false)
+  const [showBulkAchievement, setShowBulkAchievement] = useState(false)
   const [showUploadCert, setShowUploadCert] = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [viewMode, setViewMode] = useState('table') // 'table' | 'profile'
@@ -144,6 +145,16 @@ export default function StudentsTab({ focusStudentId = null }) {
 
             <button style={s.addBtn} onClick={() => setShowAddStudent(true)}>+ Add Student</button>
             <button
+              style={s.bulkAchievementBtn}
+              onClick={() => {
+                if (!students.length) return alert('No students found for the current filters.')
+                setShowBulkAchievement(true)
+              }}
+              title="Add one achievement to every student currently shown"
+            >
+              + Add Achievement to {students.length || 'All'} Students
+            </button>
+            <button
               style={{ ...s.bulkDeleteBtn, opacity: deletingClass ? 0.7 : 1 }}
               onClick={deleteClass}
               disabled={deletingClass}
@@ -256,6 +267,14 @@ export default function StudentsTab({ focusStudentId = null }) {
           studentId={selected.id}
           onClose={() => setShowAddAchievement(false)}
           onCreated={async () => { setShowAddAchievement(false); await refreshSelected() }}
+        />
+      )}
+      {showBulkAchievement && (
+        <BulkAchievementModal
+          studentIds={students.map(student => student.id)}
+          studentCount={students.length}
+          onClose={() => setShowBulkAchievement(false)}
+          onCreated={async () => { setShowBulkAchievement(false); await runSearch() }}
         />
       )}
       {showUploadCert && selected && (
@@ -437,6 +456,7 @@ function AddAchievementModal({ studentId, onClose, onCreated }) {
 
   const submit = async () => {
     if (!form.event_name) return alert('Event name is required')
+    if (!confirm(`Add this achievement to all ${studentCount} students currently shown?`)) return
     setSaving(true)
     try { await createAchievement({ student_id: studentId, ...form }); onCreated() }
     catch (e) { alert(e.response?.data?.detail || 'Failed to save') }
@@ -460,6 +480,53 @@ function AddAchievementModal({ studentId, onClose, onCreated }) {
                onChange={e => setForm({ ...form, organizer: e.target.value })} />
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={m.btnPrimary} onClick={submit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+          <button style={m.btnGhost} onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BulkAchievementModal({ studentIds, studentCount, onClose, onCreated }) {
+  const [form, setForm] = useState({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '' })
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!form.event_name) return alert('Event name is required')
+    setSaving(true)
+    try {
+      await createBulkAchievement({ student_ids: studentIds, ...form })
+      alert(`Achievement added to ${studentCount} student(s).`)
+      onCreated()
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Failed to add achievement')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={m.backdrop} onClick={onClose}>
+      <div style={m.modal} onClick={e => e.stopPropagation()}>
+        <h3 style={m.title}>Add Achievement to All</h3>
+        <p style={{ fontSize: 12.5, color: '#666', marginBottom: 16 }}>
+          This will create the same achievement for all {studentCount} students currently shown.
+        </p>
+        <input style={m.input} placeholder="Event name" value={form.event_name}
+               onChange={e => setForm({ ...form, event_name: e.target.value })} />
+        <select style={m.input} value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })}>
+          {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select style={m.input} value={form.prize_type} onChange={e => setForm({ ...form, prize_type: e.target.value })}>
+          {PRIZE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <input style={m.input} type="date" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} />
+        <input style={m.input} placeholder="Organizer / host college" value={form.organizer}
+               onChange={e => setForm({ ...form, organizer: e.target.value })} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={m.btnPrimary} onClick={submit} disabled={saving}>
+            {saving ? 'Adding...' : `Add to ${studentCount} Students`}
+          </button>
           <button style={m.btnGhost} onClick={onClose}>Cancel</button>
         </div>
       </div>
@@ -697,6 +764,16 @@ const s = {
     marginLeft: 'auto',
     cursor: 'pointer',
     boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
+  },
+  bulkAchievementBtn: {
+    padding: '9px 16px',
+    borderRadius: 9,
+    border: '1px solid #c7d2fe',
+    background: '#eef2ff',
+    color: '#4338ca',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer',
   },
   bulkDeleteBtn: {
     padding: '9px 16px',

@@ -116,6 +116,15 @@ export default function NotificationsTab() {
             <div style={s.resultDetails}>
               {result.sent} sent · {result.skipped_no_email?.length || 0} skipped (no email) · {result.failures?.length || 0} failed
             </div>
+            {result.failures?.length > 0 && (
+              <div style={s.failureDetails}>
+                {result.failures.map(failure => (
+                  <div key={failure.roll_no}>
+                    {failure.roll_no}: {failure.reason}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -248,6 +257,12 @@ const s = {
     fontSize: 12.5,
     color: '#065f46',
     marginTop: 2,
+  },
+  failureDetails: {
+    fontSize: 12,
+    color: '#b91c1c',
+    marginTop: 8,
+    lineHeight: 1.5,
   },
   tableHeaderRow: {
     display: 'flex',

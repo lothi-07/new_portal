@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { shared as s } from './sharedStyles'
-import { getDashboardStats, exportTopPerformersUrl, exportParticipantsUrl, exportNonParticipantsUrl } from '../api'
+import { getDashboardStats, exportTopPerformersUrl, exportParticipantsUrl, exportNonParticipantsUrl, createBulkAchievement } from '../api'
 
 const YEARS = ['I', 'II', 'III', 'IV']
 const SECTIONS = ['A', 'B', 'C']
@@ -16,6 +16,9 @@ export default function DashboardTab() {
   const [view, setView] = useState('top')
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showBulkAchievement, setShowBulkAchievement] = useState(false)
+  const [bulkForm, setBulkForm] = useState({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '' })
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -48,6 +51,29 @@ export default function DashboardTab() {
   const participants = Number(stats?.total_participants || 0)
   const participationRate = totalStudents > 0 ? Math.round((participants / totalStudents) * 100) : 0
 
+  const selectedStudentIds = (view === 'non_participants' ? stats?.non_participants : stats?.participants || [])
+    .map(student => student.id)
+    .filter(Boolean)
+
+  const handleBulkAdd = async () => {
+    if (!bulkForm.event_name) return alert('Event name is required')
+    if (!selectedStudentIds.length) return alert('No students available for this category.')
+    if (!confirm(`Add this achievement to all ${selectedStudentIds.length} students in the current ${view.replace('_', ' ')} list?`)) return
+
+    setBulkSaving(true)
+    try {
+      await createBulkAchievement({ student_ids: selectedStudentIds, ...bulkForm })
+      alert(`Achievement added to ${selectedStudentIds.length} student(s).`)
+      setBulkForm({ event_name: '', event_type: 'Technical', prize_type: 'Participation', event_date: '', organizer: '' })
+      setShowBulkAchievement(false)
+      await load()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to add achievement')
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       {/* Page Header */}
@@ -58,15 +84,26 @@ export default function DashboardTab() {
           <div style={s.pageTitleUnderline} />
         </div>
 
-        <a
-          href={exportUrl({ year, section })}
-          style={customStyles.exportBtn}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span>⬇</span>
-          <span>Export {VIEWS.find(v => v.key === view)?.label}</span>
-        </a>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowBulkAchievement(true)}
+            style={customStyles.bulkBtn}
+            disabled={!selectedStudentIds.length}
+            title={selectedStudentIds.length ? 'Add one achievement to all students in the current list' : 'No students in this list'}
+          >
+            + Add Achievement to {selectedStudentIds.length || 0} Students
+          </button>
+          <a
+            href={exportUrl({ year, section })}
+            style={customStyles.exportBtn}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span>⬇</span>
+            <span>Export {VIEWS.find(v => v.key === view)?.label}</span>
+          </a>
+        </div>
       </div>
 
       {/* 3 Metric Cards */}
@@ -200,6 +237,59 @@ export default function DashboardTab() {
           </div>
         )}
       </div>
+
+      {showBulkAchievement && (
+        <div style={modalStyles.backdrop} onClick={() => setShowBulkAchievement(false)}>
+          <div style={modalStyles.modal} onClick={e => e.stopPropagation()}>
+            <h3 style={modalStyles.title}>Add Achievement to {selectedStudentIds.length} students</h3>
+            <input
+              style={modalStyles.input}
+              placeholder="Event name"
+              value={bulkForm.event_name}
+              onChange={e => setBulkForm({ ...bulkForm, event_name: e.target.value })}
+            />
+            <select
+              style={modalStyles.input}
+              value={bulkForm.event_type}
+              onChange={e => setBulkForm({ ...bulkForm, event_type: e.target.value })}
+            >
+              <option value="Technical">Technical</option>
+              <option value="Non-Technical">Non-Technical</option>
+              <option value="Sports">Sports</option>
+              <option value="Cultural">Cultural</option>
+              <option value="Other">Other</option>
+            </select>
+            <select
+              style={modalStyles.input}
+              value={bulkForm.prize_type}
+              onChange={e => setBulkForm({ ...bulkForm, prize_type: e.target.value })}
+            >
+              <option value="1st Prize">1st Prize</option>
+              <option value="2nd Prize">2nd Prize</option>
+              <option value="3rd Prize">3rd Prize</option>
+              <option value="Participation">Participation</option>
+            </select>
+            <input
+              style={modalStyles.input}
+              type="date"
+              value={bulkForm.event_date}
+              onChange={e => setBulkForm({ ...bulkForm, event_date: e.target.value })}
+            />
+            <input
+              style={modalStyles.input}
+              placeholder="Organizer / host college"
+              value={bulkForm.organizer}
+              onChange={e => setBulkForm({ ...bulkForm, organizer: e.target.value })}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={modalStyles.primaryBtn} onClick={handleBulkAdd} disabled={bulkSaving}>
+                {bulkSaving ? 'Saving...' : `Add to ${selectedStudentIds.length} Students`}
+              </button>
+              <button style={modalStyles.ghostBtn} onClick={() => setShowBulkAchievement(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -223,6 +313,17 @@ const customStyles = {
     borderRadius: 6,
     letterSpacing: '0.06em',
     marginBottom: 6,
+  },
+  bulkBtn: {
+    padding: '10px 16px',
+    borderRadius: 10,
+    border: '1px solid #c7d2fe',
+    background: '#eef2ff',
+    color: '#3730a3',
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
   },
   exportBtn: {
     padding: '10px 18px',

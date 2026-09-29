@@ -87,7 +87,7 @@ export default function StaffDashboardTab() {
                       {student.roll_no} · {student.department || 'Engineering'} · {student.year} Year / Section {student.section}
                     </div>
                   </div>
-                  <div style={s.metric}><strong>{student.achievement_count}</strong><span>achievements</span></div>
+                  <div style={s.metric}><strong>{student.achievement_count}</strong><h3>achievements</h3></div>
                   <div style={s.metric}><strong>{student.total_points || 0}</strong><span>XP</span></div>
                   <div style={s.expand}>{expandedId === student.id ? '⌃' : '⌄'}</div>
                 </button>

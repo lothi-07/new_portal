@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { API_BASE, getMotivationalMessage, getStudentStats, registerForEvent } from '../api'
+import { API_BASE, createODSubmission, getMotivationalMessage, getStudentStats, registerForEvent } from '../api'
 
 const BADGES = [
   { name: 'Hackathon Hero', emoji: '🥇', events: 1, desc: 'Participate in 1 event' },
@@ -36,14 +36,61 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
   const [loading, setLoading] = useState(true)
   const [selectedFlyer, setSelectedFlyer] = useState(null)
   const [registrationFlyer, setRegistrationFlyer] = useState(null)
+  const [showODForm, setShowODForm] = useState(false)
+  const [odForm, setODForm] = useState({
+    register_number: profile?.reg_no || profile?.roll_no || '',
+    department: profile?.department || '',
+    year_section: `${profile?.year || ''} ${profile?.section || ''}`.trim(),
+    od_date: '',
+    total_days: 1,
+    student_mobile: profile?.mobile_number || '',
+    parent_mobile: '',
+    purpose: '',
+    document: null,
+  })
   const [eventType, setEventType] = useState('All')
   const [sortBy, setSortBy] = useState('newest')
   const [registration, setRegistration] = useState({
     name: profile?.first_name || '',
     email: profile?.email || '',
     roll_no: profile?.roll_no || '',
+    phone: '',
+    year: profile?.year || '',
+    department: profile?.department || '',
+    section: profile?.section || '',
+    submission_note: '',
     screenshot: null,
   })
+
+  const openRegistrationForm = (flyer) => {
+    setRegistration({
+      name: profile?.first_name || '',
+      email: profile?.email || '',
+      roll_no: profile?.roll_no || '',
+      phone: '',
+      year: profile?.year || '',
+      department: profile?.department || '',
+      section: profile?.section || '',
+      submission_note: '',
+      screenshot: null,
+    })
+    setRegistrationFlyer(flyer)
+  }
+
+  const openODForm = () => {
+    setODForm({
+      register_number: profile?.reg_no || profile?.roll_no || '',
+      department: profile?.department || '',
+      year_section: `${profile?.year || ''} ${profile?.section || ''}`.trim(),
+      od_date: '',
+      total_days: 1,
+      student_mobile: profile?.mobile_number || '',
+      parent_mobile: '',
+      purpose: '',
+      document: null,
+    })
+    setShowODForm(true)
+  }
 
   useEffect(() => {
     let active = true
@@ -144,6 +191,12 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
               onClick={() => onNavigateTab && onNavigateTab('certificates')}
             >
               📜 Certificate Gallery
+            </button>
+            <button
+              style={styles.heroSecondaryBtn}
+              onClick={openODForm}
+            >
+              📝 OD Form Submission
             </button>
           </div>
         </div>
@@ -315,7 +368,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                         <button
                           type="button"
                           style={styles.registerBtn}
-                          onClick={() => setRegistrationFlyer(flyer)}
+                          onClick={() => openRegistrationForm(flyer)}
                         >
                           Register Now →
                         </button>
@@ -410,8 +463,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
 
             <div style={styles.regModalBody}>
               <p style={styles.regInstruction}>
-                Step 1: Open and complete the external event registration form (if applicable).<br />
-                Step 2: Upload the confirmation screenshot below to record your campus entry.
+                Upload your registration confirmation.
               </p>
 
               {registrationFlyer.registration_url && (
@@ -422,6 +474,56 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                 >
                   🔗 Open External Registration Portal
                 </button>
+              )}
+
+              {showODForm && (
+                <div style={styles.modalBackdrop} onClick={() => setShowODForm(false)}>
+                  <div style={styles.regModal} onClick={e => e.stopPropagation()}>
+                    <div style={styles.regModalHeader}>
+                      <h3 style={styles.regHeading}>On-Duty (OD) Form Submission</h3>
+                      <button style={styles.modalCloseBtn} onClick={() => setShowODForm(false)}>✕</button>
+                    </div>
+                    <div style={styles.regModalBody}>
+                      <p style={styles.regInstruction}>
+                        Fill in your OD details and submit them for admin approval.
+                      </p>
+                      <label style={styles.regLabel}>Register Number *</label>
+                      <input style={styles.regInput} value={odForm.register_number} onChange={e => setODForm({ ...odForm, register_number: e.target.value })} />
+                      <div style={styles.regTwoCol}>
+                        <div><label style={styles.regLabel}>Department</label><input style={styles.regInput} value={odForm.department} onChange={e => setODForm({ ...odForm, department: e.target.value })} /></div>
+                        <div><label style={styles.regLabel}>Year & Section</label><input style={styles.regInput} value={odForm.year_section} onChange={e => setODForm({ ...odForm, year_section: e.target.value })} /></div>
+                      </div>
+                      <div style={styles.regTwoCol}>
+                        <div><label style={styles.regLabel}>OD Date *</label><input type="date" style={styles.regInput} value={odForm.od_date} onChange={e => setODForm({ ...odForm, od_date: e.target.value })} /></div>
+                        <div><label style={styles.regLabel}>Total Days *</label><input type="number" min="1" style={styles.regInput} value={odForm.total_days} onChange={e => setODForm({ ...odForm, total_days: e.target.value })} /></div>
+                      </div>
+                      <div style={styles.regTwoCol}>
+                        <div><label style={styles.regLabel}>Student Mobile</label><input style={styles.regInput} value={odForm.student_mobile} onChange={e => setODForm({ ...odForm, student_mobile: e.target.value })} /></div>
+                        <div><label style={styles.regLabel}>Parent Mobile</label><input style={styles.regInput} value={odForm.parent_mobile} onChange={e => setODForm({ ...odForm, parent_mobile: e.target.value })} /></div>
+                      </div>
+                      <label style={styles.regLabel}>Purpose of OD *</label>
+                      <textarea style={styles.regTextarea} value={odForm.purpose} onChange={e => setODForm({ ...odForm, purpose: e.target.value })} placeholder="Enter the reason for your on-duty request" />
+                      <label style={styles.regLabel}>OD Document / Signed Form (optional)</label>
+                      <input style={styles.regFileInput} type="file" accept="image/*,application/pdf" onChange={e => setODForm({ ...odForm, document: e.target.files?.[0] || null })} />
+                      <button
+                        type="button"
+                        style={styles.regSubmitBtn}
+                        onClick={async () => {
+                          if (!odForm.register_number || !odForm.od_date || !odForm.purpose) return alert('Please fill register number, OD date, and purpose.')
+                          try {
+                            await createODSubmission(odForm)
+                            alert('OD form submitted successfully. Admin approval is pending.')
+                            setShowODForm(false)
+                          } catch (error) {
+                            alert(error.response?.data?.detail || 'Unable to submit OD form')
+                          }
+                        }}
+                      >
+                        Submit OD Form →
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <label style={styles.regLabel}>Full Name</label>
@@ -449,6 +551,56 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                 onChange={e => setRegistration({ ...registration, roll_no: e.target.value })}
               />
 
+              <div style={styles.regTwoCol}>
+                <div>
+                  <label style={styles.regLabel}>Phone Number</label>
+                  <input
+                    style={styles.regInput}
+                    placeholder="Phone"
+                    value={registration.phone}
+                    onChange={e => setRegistration({ ...registration, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={styles.regLabel}>Year</label>
+                  <input
+                    style={styles.regInput}
+                    placeholder="II / III"
+                    value={registration.year}
+                    onChange={e => setRegistration({ ...registration, year: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={styles.regTwoCol}>
+                <div>
+                  <label style={styles.regLabel}>Department</label>
+                  <input
+                    style={styles.regInput}
+                    placeholder="AI & DS"
+                    value={registration.department}
+                    onChange={e => setRegistration({ ...registration, department: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={styles.regLabel}>Section</label>
+                  <input
+                    style={styles.regInput}
+                    placeholder="A"
+                    value={registration.section}
+                    onChange={e => setRegistration({ ...registration, section: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <label style={styles.regLabel}>Additional Details</label>
+              <textarea
+                style={styles.regTextarea}
+                placeholder="Tell the admin anything relevant about your participation or team details..."
+                value={registration.submission_note}
+                onChange={e => setRegistration({ ...registration, submission_note: e.target.value })}
+              />
+
               <label style={styles.regLabel}>Registration Confirmation Screenshot *</label>
               <input
                 style={styles.regFileInput}
@@ -465,7 +617,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                     return alert('Please fill in your details and upload the registration screenshot.')
                   }
                   try {
-                    await registerForEvent(registrationFlyer.id, registration.screenshot)
+                    await registerForEvent(registrationFlyer.id, registration)
                     alert(`Registration successfully submitted for ${registrationFlyer.title}`)
                     setRegistrationFlyer(null)
                   } catch (error) {
@@ -474,8 +626,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                 }}
               >
                 Submit Verified Registration →
-              </button>
-            </div>
+              </button>            </div>
           </div>
         </div>
       )}
@@ -1127,6 +1278,24 @@ const styles = {
     border: '1.5px solid #cbd5e1',
     fontSize: 13,
     outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  regTwoCol: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 10,
+  },
+  regTextarea: {
+    padding: '9px 12px',
+    borderRadius: 8,
+    border: '1.5px solid #cbd5e1',
+    fontSize: 13,
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: 70,
+    width: '100%',
+    boxSizing: 'border-box',
   },
   regFileInput: {
     padding: '8px 10px',

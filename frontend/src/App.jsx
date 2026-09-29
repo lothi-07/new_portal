@@ -12,6 +12,7 @@ import StaffDashboardTab from './tabs/StaffDashboardTab.jsx'
 import StudentView from "./StudentView.jsx"
 import RegistrationReviewTab from './tabs/RegistrationReviewTab.jsx'
 import MentorsTab from './tabs/MentorsTab.jsx'
+import ODReviewTab from './tabs/ODReviewTab.jsx'
 
 const NAV_ITEMS = [
   { key: 'staff-dashboard', label: 'Dashboard', icon: DashboardIcon, staffOnly: true },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { key: 'dashboard',    label: 'Analytics Dashboard', icon: DashboardIcon, adminOnly: true },
   { key: 'events',       label: 'Student Participation', icon: SearchIcon, adminOnly: true },
   { key: 'registrations', label: 'Event Registrations', icon: ClipboardIcon },
+  { key: 'od-submissions', label: 'OD Form Submissions', icon: ClipboardIcon },
   { key: 'certificates', label: 'Certificate Generator', icon: CertIcon, adminOnly: true },
   { key: 'flyers',       label: 'Academic Event Flyers', icon: FlyerIcon },
 ]
@@ -201,6 +203,7 @@ export default function App() {
             {activeTab === 'dashboard'    && <DashboardTab />}
             {activeTab === 'events'       && <EventSearchTab />}
             {activeTab === 'registrations' && <RegistrationReviewTab />}
+            {activeTab === 'od-submissions' && <ODReviewTab />}
             {activeTab === 'certificates' && <CertificatesTab />}
             {activeTab === 'import'       && <ImportTab />}
             {activeTab === 'notifications' && <NotificationsTab />}

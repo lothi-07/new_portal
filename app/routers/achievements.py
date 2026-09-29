@@ -56,6 +56,36 @@ def create_achievement(
     return db_achievement
 
 
+@router.post("/bulk")
+def create_bulk_achievement(
+    achievement: schemas.BulkAchievementCreate,
+    db: Session = Depends(get_db),
+    admin: str = Depends(get_current_admin),
+):
+    student_ids = list(dict.fromkeys(achievement.student_ids))
+    if not student_ids:
+        raise HTTPException(status_code=400, detail="Select at least one student")
+
+    students = db.query(models.Student).filter(models.Student.id.in_(student_ids)).all()
+    found_ids = {student.id for student in students}
+    missing_ids = [student_id for student_id in student_ids if student_id not in found_ids]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail="One or more selected students were not found")
+
+    achievement_data = achievement.model_dump(exclude={"student_ids"})
+    created = [
+        models.Achievement(student_id=student_id, source="manual", **achievement_data)
+        for student_id in student_ids
+    ]
+    db.add_all(created)
+    db.commit()
+
+    for student_id in student_ids:
+        update_student_stats(student_id, db)
+
+    return {"created_count": len(created)}
+
+
 @router.post("/upload-certificate", response_model=schemas.AchievementOut)
 def upload_certificate(
     student_id: int = Form(...),

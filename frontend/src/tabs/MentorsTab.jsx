@@ -242,8 +242,8 @@ export default function MentorsTab({ isStaff = false }) {
                             {savingId === student.id ? 'Removing...' : 'Remove'}
                           </button>}
                         </div> : (
-                          <button type="button" style={s.assignBtn} onClick={() => updateMentor(student.id, '')} disabled={savingId === student.id}>
-                            {savingId === student.id ? 'Assigning...' : student.mentor_id ? 'Assigned' : 'Assign to Me'}
+                          <button type="button" style={student.mentor_id ? s.removeBtn : s.assignBtn} onClick={() => student.mentor_id ? removeMentor(student) : updateMentor(student.id, '')} disabled={savingId === student.id}>
+                            {savingId === student.id ? (student.mentor_id ? 'Removing...' : 'Assigning...') : student.mentor_id ? 'Remove from My Students' : 'Assign to Me'}
                           </button>
                         )}
                       </td>

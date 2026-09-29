@@ -1,6 +1,12 @@
 import os
 import smtplib
 from email.message import EmailMessage
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 def send_achievement_reminder(recipient: str, student_name: str, achievement_count: int, minimum: int) -> None:

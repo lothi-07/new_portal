@@ -375,11 +375,20 @@ def assign_mentor(
 def remove_student_mentor(
     student_id: int,
     db: Session = Depends(get_db),
-    admin: str = Depends(get_current_admin),
+    current_user: dict = Depends(get_current_staff_or_admin),
 ):
     student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+    if current_user["role"] == "staff":
+        mentor = db.query(models.StaffUser).filter(
+            models.StaffUser.email == current_user["email"],
+            models.StaffUser.is_active.is_(True),
+        ).first()
+        if not mentor:
+            raise HTTPException(status_code=403, detail="Active staff account not found")
+        if student.mentor_id != mentor.id:
+            raise HTTPException(status_code=403, detail="You can only unassign students assigned to you")
     student.mentor_id = None
     db.commit()
     return {

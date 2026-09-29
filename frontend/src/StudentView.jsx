@@ -420,12 +420,6 @@ export default function StudentView({ session, onLogout }) {
                   <h1 style={styles.pageTitle}>Verified Certificate Gallery</h1>
                   <p style={styles.pageSub}>Institutional credentials, digital badges, and shareable verified certificates.</p>
                 </div>
-                <button
-                  onClick={() => setShowUploadCertificate(true)}
-                  style={styles.addAchievementBtn}
-                >
-                  + Upload New Certificate
-                </button>
               </div>
 
               {achievements.filter(a => a.certificate_upload_path).length === 0 ? (

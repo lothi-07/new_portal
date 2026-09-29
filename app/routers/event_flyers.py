@@ -1,4 +1,5 @@
 import os
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -15,8 +16,43 @@ FLYER_DIR = Path(__file__).resolve().parent.parent / "static" / "event-flyers"
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 
 
+def _parse_date(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def cleanup_expired_event_flyers(db: Session) -> int:
+    today = date.today()
+    expired_flyers = []
+    for flyer in db.query(models.EventFlyer).filter(models.EventFlyer.event_end_date.isnot(None)).all():
+        end_date = _parse_date(flyer.event_end_date)
+        if end_date is None or end_date >= today:
+            continue
+        expired_flyers.append(flyer)
+
+    for flyer in expired_flyers:
+        file_name = Path(flyer.flyer_path).name if flyer.flyer_path else None
+        if file_name:
+            file_path = FLYER_DIR / file_name
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except OSError:
+                    pass
+        db.delete(flyer)
+
+    if expired_flyers:
+        db.commit()
+    return len(expired_flyers)
+
+
 @router.get("/")
 def list_event_flyers(db: Session = Depends(get_db)):
+    cleanup_expired_event_flyers(db)
     return [
         {
             "id": flyer.id, "title": flyer.title, "description": flyer.description,
@@ -72,6 +108,7 @@ async def upload_event_flyer(
     db.add(flyer)
     db.commit()
     db.refresh(flyer)
+    cleanup_expired_event_flyers(db)
     return {"id": flyer.id, "message": "Event flyer uploaded"}
 
 
