@@ -81,8 +81,8 @@ export default function LoginPage({ onLoggedIn }) {
   // ── Student Welcome Celebratory Screen ──
   if (loginType === 'student' && studentName) {
     return (
-      <div style={s.welcomePage}>
-        <div style={s.welcomeCard}>
+      <div className="login-welcome-page" style={s.welcomePage}>
+        <div className="login-welcome-card" style={s.welcomeCard}>
           <div style={s.welcomeBadge}>
             <span style={s.welcomeBadgeIcon}>✓</span>
             <span>Identity Verified</span>
@@ -99,17 +99,17 @@ export default function LoginPage({ onLoggedIn }) {
             Your academic records, participation history, and official certificates are synchronized and ready.
           </p>
 
-          <div style={s.welcomeMetaRow}>
+          <div className="login-welcome-meta" style={s.welcomeMetaRow}>
             <div style={s.welcomeMetaItem}>
               <span style={s.welcomeMetaLabel}>Roll No</span>
               <strong style={s.welcomeMetaValue}>{studentData?.roll_no || rollNo.toUpperCase()}</strong>
             </div>
-            <div style={s.welcomeMetaDivider} />
+            <div className="login-welcome-divider" style={s.welcomeMetaDivider} />
             <div style={s.welcomeMetaItem}>
               <span style={s.welcomeMetaLabel}>Section</span>
               <strong style={s.welcomeMetaValue}>{studentData?.year || '—'} Year / {studentData?.section || '—'}</strong>
             </div>
-            <div style={s.welcomeMetaDivider} />
+            <div className="login-welcome-divider" style={s.welcomeMetaDivider} />
             <div style={s.welcomeMetaItem}>
               <span style={s.welcomeMetaLabel}>Status</span>
               <strong style={{ ...s.welcomeMetaValue, color: '#10b981' }}>Active Scholar</strong>
@@ -131,26 +131,26 @@ export default function LoginPage({ onLoggedIn }) {
 
   // ── Main Split-Screen Login ──
   return (
-    <div style={s.page}>
+    <div className="login-page" style={s.page}>
       {/* Top institution banner */}
-      <header style={s.header}>
-        <div style={s.headerBrand}>
+      <header className="login-header" style={s.header}>
+        <div className="login-header-brand" style={s.headerBrand}>
           <div style={s.headerLogo}>ESEC</div>
           <div>
             <div style={s.headerTitle}>ERODE SENGUNTHAR ENGINEERING COLLEGE</div>
-            <div style={s.headerSubtitle}>Autonomous Institution • Affiliated to Anna University • Approved by AICTE</div>
+            <div className="login-header-subtitle" style={s.headerSubtitle}>Autonomous Institution • Affiliated to Anna University • Approved by AICTE</div>
           </div>
         </div>
-        <div style={s.headerRightTag}>
+        <div className="login-header-tag" style={s.headerRightTag}>
           <span style={s.tagDot} />
           Student Achievement & Records Portal
         </div>
       </header>
 
       {/* Main Login Grid */}
-      <main style={s.mainGrid}>
+      <main className="login-main-grid" style={s.mainGrid}>
         {/* Left: Showcase & Value Prop */}
-        <section style={s.showcaseSection}>
+        <section className="login-showcase" style={s.showcaseSection}>
           <div style={s.showcasePill}>
             <span style={s.pillStar}>★</span>
             <span>Official Campus Milestone Tracker</span>
@@ -193,8 +193,8 @@ export default function LoginPage({ onLoggedIn }) {
         </section>
 
         {/* Right: Modern Form Card */}
-        <section style={s.formSection}>
-          <div style={s.loginCard}>
+        <section className="login-form-section" style={s.formSection}>
+          <div className="login-card" style={s.loginCard}>
             <div style={s.cardHeader}>
               <div style={s.cardBadge}>
                 {loginType === 'student' ? 'STUDENT ACCESS' : showSignup ? 'STAFF REGISTRATION' : 'STAFF ACCESS'}
