@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { API_BASE, createODSubmission, getMotivationalMessage, getStudentStats, registerForEvent } from '../api'
+import { API_BASE, getMotivationalMessage, getStudentStats, registerForEvent } from '../api'
 
 const BADGES = [
   { name: 'Hackathon Hero', emoji: '🥇', events: 1, desc: 'Participate in 1 event' },
@@ -36,18 +36,6 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
   const [loading, setLoading] = useState(true)
   const [selectedFlyer, setSelectedFlyer] = useState(null)
   const [registrationFlyer, setRegistrationFlyer] = useState(null)
-  const [showODForm, setShowODForm] = useState(false)
-  const [odForm, setODForm] = useState({
-    register_number: profile?.reg_no || profile?.roll_no || '',
-    department: profile?.department || '',
-    year_section: `${profile?.year || ''} ${profile?.section || ''}`.trim(),
-    od_date: '',
-    total_days: 1,
-    student_mobile: profile?.mobile_number || '',
-    parent_mobile: '',
-    purpose: '',
-    document: null,
-  })
   const [eventType, setEventType] = useState('All')
   const [sortBy, setSortBy] = useState('newest')
   const [registration, setRegistration] = useState({
@@ -77,20 +65,6 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
     setRegistrationFlyer(flyer)
   }
 
-  const openODForm = () => {
-    setODForm({
-      register_number: profile?.reg_no || profile?.roll_no || '',
-      department: profile?.department || '',
-      year_section: `${profile?.year || ''} ${profile?.section || ''}`.trim(),
-      od_date: '',
-      total_days: 1,
-      student_mobile: profile?.mobile_number || '',
-      parent_mobile: '',
-      purpose: '',
-      document: null,
-    })
-    setShowODForm(true)
-  }
 
   useEffect(() => {
     let active = true
@@ -119,6 +93,15 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
     loadDashboard()
     return () => { active = false }
   }, [studentId])
+
+  useEffect(() => {
+    if (selectedFlyer && !flyers.some(flyer => flyer.id === selectedFlyer.id)) {
+      setSelectedFlyer(null)
+    }
+    if (registrationFlyer && !flyers.some(flyer => flyer.id === registrationFlyer.id)) {
+      setRegistrationFlyer(null)
+    }
+  }, [flyers, selectedFlyer, registrationFlyer])
 
   if (loading) {
     return (
@@ -153,9 +136,9 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
     .slice(0, 5)
 
   return (
-    <div style={styles.dashboardContainer}>
+    <div className="student-dashboard" style={styles.dashboardContainer}>
       {/* ── Welcome Hero Banner ── */}
-      <section style={styles.heroCard}>
+      <section className="student-dashboard-hero" style={styles.heroCard}>
         <div style={styles.heroContent}>
           <div style={styles.heroBadgeRow}>
             <span style={styles.levelBadge}>Level {studentLevel} Innovator</span>
@@ -192,12 +175,6 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
             >
               📜 Certificate Gallery
             </button>
-            <button
-              style={styles.heroSecondaryBtn}
-              onClick={openODForm}
-            >
-              📝 OD Form Submission
-            </button>
           </div>
         </div>
 
@@ -210,7 +187,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
       </section>
 
       {/* ── KPI Stats Grid ── */}
-      <section style={styles.statsGrid}>
+      <section className="student-dashboard-stats" style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={{ ...styles.statIconBox, background: '#eff6ff', color: '#2563eb' }}>🎯</div>
           <div>
@@ -235,7 +212,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
       </section>
 
       {/* ── Main Two-Column Layout ── */}
-      <div style={styles.layoutColumns}>
+      <div className="student-dashboard-columns" style={styles.layoutColumns}>
         {/* Left Primary Column: Milestone Progress + Event Opportunities */}
         <div style={styles.leftCol}>
           {/* Milestone Progress Bar Card */}
@@ -324,7 +301,7 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                 <p>No active event flyers published in this category.</p>
               </div>
             ) : (
-              <div style={styles.flyerGrid}>
+              <div className="student-flyer-grid" style={styles.flyerGrid}>
                 {filteredFlyers.map(flyer => (
                   <div key={flyer.id} style={styles.flyerCard}>
                     <div
@@ -474,56 +451,6 @@ export default function StudentDashboardTab({ studentId, profile, flyers = [], o
                 >
                   🔗 Open External Registration Portal
                 </button>
-              )}
-
-              {showODForm && (
-                <div style={styles.modalBackdrop} onClick={() => setShowODForm(false)}>
-                  <div style={styles.regModal} onClick={e => e.stopPropagation()}>
-                    <div style={styles.regModalHeader}>
-                      <h3 style={styles.regHeading}>On-Duty (OD) Form Submission</h3>
-                      <button style={styles.modalCloseBtn} onClick={() => setShowODForm(false)}>✕</button>
-                    </div>
-                    <div style={styles.regModalBody}>
-                      <p style={styles.regInstruction}>
-                        Fill in your OD details and submit them for admin approval.
-                      </p>
-                      <label style={styles.regLabel}>Register Number *</label>
-                      <input style={styles.regInput} value={odForm.register_number} onChange={e => setODForm({ ...odForm, register_number: e.target.value })} />
-                      <div style={styles.regTwoCol}>
-                        <div><label style={styles.regLabel}>Department</label><input style={styles.regInput} value={odForm.department} onChange={e => setODForm({ ...odForm, department: e.target.value })} /></div>
-                        <div><label style={styles.regLabel}>Year & Section</label><input style={styles.regInput} value={odForm.year_section} onChange={e => setODForm({ ...odForm, year_section: e.target.value })} /></div>
-                      </div>
-                      <div style={styles.regTwoCol}>
-                        <div><label style={styles.regLabel}>OD Date *</label><input type="date" style={styles.regInput} value={odForm.od_date} onChange={e => setODForm({ ...odForm, od_date: e.target.value })} /></div>
-                        <div><label style={styles.regLabel}>Total Days *</label><input type="number" min="1" style={styles.regInput} value={odForm.total_days} onChange={e => setODForm({ ...odForm, total_days: e.target.value })} /></div>
-                      </div>
-                      <div style={styles.regTwoCol}>
-                        <div><label style={styles.regLabel}>Student Mobile</label><input style={styles.regInput} value={odForm.student_mobile} onChange={e => setODForm({ ...odForm, student_mobile: e.target.value })} /></div>
-                        <div><label style={styles.regLabel}>Parent Mobile</label><input style={styles.regInput} value={odForm.parent_mobile} onChange={e => setODForm({ ...odForm, parent_mobile: e.target.value })} /></div>
-                      </div>
-                      <label style={styles.regLabel}>Purpose of OD *</label>
-                      <textarea style={styles.regTextarea} value={odForm.purpose} onChange={e => setODForm({ ...odForm, purpose: e.target.value })} placeholder="Enter the reason for your on-duty request" />
-                      <label style={styles.regLabel}>OD Document / Signed Form (optional)</label>
-                      <input style={styles.regFileInput} type="file" accept="image/*,application/pdf" onChange={e => setODForm({ ...odForm, document: e.target.files?.[0] || null })} />
-                      <button
-                        type="button"
-                        style={styles.regSubmitBtn}
-                        onClick={async () => {
-                          if (!odForm.register_number || !odForm.od_date || !odForm.purpose) return alert('Please fill register number, OD date, and purpose.')
-                          try {
-                            await createODSubmission(odForm)
-                            alert('OD form submitted successfully. Admin approval is pending.')
-                            setShowODForm(false)
-                          } catch (error) {
-                            alert(error.response?.data?.detail || 'Unable to submit OD form')
-                          }
-                        }}
-                      >
-                        Submit OD Form →
-                      </button>
-                    </div>
-                  </div>
-                </div>
               )}
 
               <label style={styles.regLabel}>Full Name</label>

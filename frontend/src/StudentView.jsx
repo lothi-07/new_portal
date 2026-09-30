@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { API_BASE, getStudent, listEventFlyers, getMyRegistrations, uploadStudentPhoto, uploadCertificate, deleteAchievement, photoUrl, publicAssetUrl } from './api'
 import StudentDashboardTab from './tabs/StudentDashboardTab'
 import CertificateViewer from './components/CertificateViewer'
+import StudentODTab from './tabs/StudentODTab'
 
 const EVENT_TYPES = ['Technical', 'Non-Technical', 'Sports', 'Cultural', 'Other']
 const PRIZE_TYPES = ['1st Prize', '2nd Prize', '3rd Prize', 'Participation']
 
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', icon: DashboardIcon, label: 'Dashboard & Events' },
+  { id: 'od', icon: ODIcon, label: 'OD Form Submission' },
   { id: 'participation', icon: TrophyIcon, label: 'My Achievements' },
   { id: 'certificates', icon: CertIcon, label: 'Verified Certificates' },
 ]
@@ -126,6 +128,30 @@ export default function StudentView({ session, onLogout }) {
   }, [session])
 
   useEffect(() => {
+    let active = true
+    const refreshFlyers = async () => {
+      try {
+        const response = await listEventFlyers()
+        if (active && Array.isArray(response.data)) setFlyers(response.data)
+      } catch (error) {
+        console.error('Failed to refresh event flyers:', error)
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshFlyers()
+    }
+    window.addEventListener('focus', refreshFlyers)
+    document.addEventListener('visibilitychange', handleVisibility)
+    const intervalId = window.setInterval(refreshFlyers, 15000)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refreshFlyers)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
     const openCertificates = () => setShowUploadCertificate(true)
     window.addEventListener('openStudentCertificates', openCertificates)
     return () => window.removeEventListener('openStudentCertificates', openCertificates)
@@ -230,9 +256,9 @@ export default function StudentView({ session, onLogout }) {
   }
 
   return (
-    <div style={styles.pageShell}>
+    <div className="student-view" style={styles.pageShell}>
       {/* ── Sidebar ── */}
-      <aside style={styles.studentSidebar}>
+      <aside className="student-sidebar" style={styles.studentSidebar}>
         {/* Brand */}
         <div style={styles.studentBrand}>
           <div style={styles.brandLogo}>ESEC</div>
@@ -260,8 +286,8 @@ export default function StudentView({ session, onLogout }) {
         </div>
 
         {/* Navigation */}
-        <nav style={styles.navStack}>
-          <div style={styles.navHeader}>NAVIGATION</div>
+        <nav className="student-nav-stack" style={styles.navStack}>
+          <div className="student-nav-header" style={styles.navHeader}>NAVIGATION</div>
           {SIDEBAR_ITEMS.map(({ id, icon: Icon, label }) => {
             const active = activeTab === id
             return (
@@ -269,13 +295,14 @@ export default function StudentView({ session, onLogout }) {
                 key={id}
                 type="button"
                 onClick={() => setActiveTab(id)}
+                className="student-nav-item"
                 style={{ ...styles.studentNavItem, ...(active ? styles.studentNavActive : {}) }}
               >
                 <div style={{ ...styles.navIconBox, ...(active ? styles.navIconBoxActive : {}) }}>
                   <Icon active={active} />
                 </div>
-                <span style={styles.navItemLabel}>{label}</span>
-                {active && <span style={styles.navActiveDot} />}
+                <span className="student-nav-label" style={styles.navItemLabel}>{label}</span>
+                {active && <span className="student-nav-active-dot" style={styles.navActiveDot} />}
               </button>
             )
           })}
@@ -291,10 +318,10 @@ export default function StudentView({ session, onLogout }) {
       </aside>
 
       {/* ── Main Area ── */}
-      <div style={styles.pageWrap}>
+      <div className="student-page-wrap" style={styles.pageWrap}>
         {/* Top Bar */}
-        <header style={styles.topBar}>
-          <div style={styles.topGreeting}>
+        <header className="student-top-bar" style={styles.topBar}>
+          <div className="student-top-greeting" style={styles.topGreeting}>
             <span style={styles.greetingPill}>Campus News</span>
             <span style={styles.topLineText}>{topLine}</span>
           </div>
@@ -311,7 +338,7 @@ export default function StudentView({ session, onLogout }) {
         </header>
 
         {/* Tab Content Panes */}
-        <main style={styles.mainContent}>
+        <main className="student-main-content" style={styles.mainContent}>
           {activeTab === 'dashboard' && (
             <StudentDashboardTab
               studentId={studentId}
@@ -321,15 +348,17 @@ export default function StudentView({ session, onLogout }) {
             />
           )}
 
+          {activeTab === 'od' && <StudentODTab profile={profile} />}
+
           {activeTab === 'participation' && (
-            <div style={styles.tabCardWrap}>
-              <div style={styles.pageTitleBar}>
+            <div className="student-tab-card" style={styles.tabCardWrap}>
+              <div className="student-page-title-bar" style={styles.pageTitleBar}>
                 <div>
                   <h1 style={styles.pageTitle}>My Achievements</h1>
                   <p style={styles.pageSub}>Official records of your academic and extracurricular recognitions.</p>
                 </div>
 
-                <div style={styles.actionRow}>
+                <div className="student-action-row" style={styles.actionRow}>
                   <label style={styles.voucherUploadBtn}>
                     <input type="file" accept="image/*,.pdf" onChange={handleVoucherUpload} style={{ display: 'none' }} />
                     📎 {voucherUploaded ? '✓ Voucher Uploaded' : 'Upload Event Voucher'}
@@ -345,7 +374,7 @@ export default function StudentView({ session, onLogout }) {
               </div>
 
               {!voucherUploaded && (
-                <div style={styles.voucherHintBox}>
+                <div className="student-voucher-hint" style={styles.voucherHintBox}>
                   <div style={styles.hintIcon}>ℹ️</div>
                   <div>
                     <strong>Verification Rule:</strong> Upload your event confirmation voucher or fee receipt first to unlock manual achievement entry.
@@ -354,13 +383,13 @@ export default function StudentView({ session, onLogout }) {
               )}
 
               {achievements.length === 0 ? (
-                <div style={styles.emptyCard}>
+                <div className="student-empty-card" style={styles.emptyCard}>
                   <div style={styles.emptyIcon}>🏆</div>
                   <h3 style={styles.emptyHeading}>No Achievements Recorded Yet</h3>
                   <p style={styles.emptyText}>Upload your participation certificate and win prizes to build your college milestone portfolio!</p>
                 </div>
               ) : (
-                <div style={styles.achievementGrid}>
+                <div className="student-achievement-grid" style={styles.achievementGrid}>
                   {achievements.map((a, idx) => {
                     const prize = a.prize_type || 'Participation'
                     const isWinner = prize.includes('1st') || prize.includes('2nd') || prize.includes('3rd')
@@ -414,7 +443,7 @@ export default function StudentView({ session, onLogout }) {
           )}
 
           {activeTab === 'certificates' && (
-            <div style={styles.tabCardWrap}>
+            <div className="student-tab-card" style={styles.tabCardWrap}>
               <div style={styles.pageTitleBar}>
                 <div>
                   <h1 style={styles.pageTitle}>Verified Certificate Gallery</h1>
@@ -429,7 +458,7 @@ export default function StudentView({ session, onLogout }) {
                   <p style={styles.emptyText}>Upload event certificates to build your verified academic repository.</p>
                 </div>
               ) : (
-                <div style={styles.certGrid}>
+                <div className="student-cert-grid" style={styles.certGrid}>
                   {achievements.filter(a => a.certificate_upload_path).map(a => (
                     <div key={a.id} style={styles.certCard}>
                       <div
@@ -460,7 +489,7 @@ export default function StudentView({ session, onLogout }) {
                         <h4 style={styles.certTitle}>{a.event_name}</h4>
                         <p style={styles.certDate}>{a.event_date || 'Milestone Record'}</p>
 
-                        <div style={styles.certActionList}>
+                        <div className="student-cert-actions" style={styles.certActionList}>
                           <a
                             href={certUrl(a.certificate_upload_path)}
                             target="_blank"
@@ -1503,6 +1532,16 @@ function CertIcon({ active }) {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="6" />
       <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+    </svg>
+  )
+}
+
+function ODIcon({ active }) {
+  const color = active ? '#60a5fa' : 'currentColor'
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6M8 13h8M8 17h8" />
     </svg>
   )
 }

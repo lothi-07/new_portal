@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { API_BASE, getRegistrations, verifyRegistration } from '../api'
+import { API_BASE, getRegistrations } from '../api'
 import { shared as sh } from './sharedStyles'
 
 export default function RegistrationReviewTab() {
@@ -16,18 +16,6 @@ export default function RegistrationReviewTab() {
   }
 
   useEffect(() => { load() }, [])
-
-  const handleDecision = async (id, approved, reason = '') => {
-    try {
-      await verifyRegistration(id, approved, reason)
-      await load()
-      if (selected?.id === id) {
-        setSelected(null)
-      }
-    } catch (e) {
-      alert(e.response?.data?.detail || 'Unable to update registration status')
-    }
-  }
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -71,7 +59,7 @@ export default function RegistrationReviewTab() {
                   <th style={sh.th}>Event Name</th>
                   <th style={{ ...sh.th, textAlign: 'center' }}>Status</th>
                   <th style={{ ...sh.th, textAlign: 'center' }}>Registration Proof</th>
-                  <th style={{ ...sh.th, textAlign: 'center' }}>Review</th>
+                  <th style={{ ...sh.th, textAlign: 'center' }}>Details</th>
                   <th style={{ ...sh.th, textAlign: 'center' }}>Certificate</th>
                 </tr>
               </thead>
@@ -100,15 +88,7 @@ export default function RegistrationReviewTab() {
                       )}
                     </td>
                     <td style={{ ...sh.td, textAlign: 'center' }}>
-                      <div style={s.actionWrap}>
-                        <button type="button" style={s.viewBtn} onClick={() => setSelected(item)}>View</button>
-                        {item.verification_status !== 'approved' && (
-                          <button type="button" style={s.approveBtn} onClick={() => handleDecision(item.id, true)}>Approve</button>
-                        )}
-                        {item.verification_status !== 'rejected' && (
-                          <button type="button" style={s.rejectBtn} onClick={() => handleDecision(item.id, false, 'Not approved by admin')}>Reject</button>
-                        )}
-                      </div>
+                      <button type="button" style={s.viewBtn} onClick={() => setSelected(item)}>View</button>
                     </td>
                     <td style={{ ...sh.td, textAlign: 'center' }}>
                       {item.certificate_upload_path ? (
@@ -149,11 +129,6 @@ export default function RegistrationReviewTab() {
                 <img src={`${API_BASE}${selected.registration_screenshot_path}`} alt="registration proof" style={s.previewImage} />
               </div>
             )}
-
-            <div style={s.modalActions}>
-              <button type="button" style={s.approveBtn} onClick={() => handleDecision(selected.id, true)}>Approve</button>
-              <button type="button" style={s.rejectBtn} onClick={() => handleDecision(selected.id, false, 'Not approved by admin')}>Reject</button>
-            </div>
           </div>
         </div>
       )}

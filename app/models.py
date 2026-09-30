@@ -41,7 +41,7 @@ class EventFlyer(Base):
     flyer_content_type = Column(String, nullable=True)
     uploaded_by = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    registrations = relationship("EventRegistration", back_populates="flyer")
+    registrations = relationship("EventRegistration", back_populates="flyer", cascade="all, delete-orphan")
 
 
 class EventRegistration(Base):

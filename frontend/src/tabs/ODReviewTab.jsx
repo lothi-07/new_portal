@@ -99,8 +99,8 @@ export default function ODReviewTab() {
             </div>
             {selected.document_path && <a style={s.document} href={`${API_BASE}${selected.document_path}`} target="_blank" rel="noreferrer">View uploaded OD document ↗</a>}
             <div style={s.modalActions}>
-              <button style={s.approve} onClick={() => decide(selected.id, true)}>Approve</button>
-              <button style={s.reject} onClick={() => decide(selected.id, false)}>Reject</button>
+              {selected.status !== 'approved' && <button style={s.approve} onClick={() => decide(selected.id, true)}>Approve</button>}
+              {selected.status !== 'rejected' && <button style={s.reject} onClick={() => decide(selected.id, false)}>Reject</button>}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -14,6 +15,32 @@ from ..database import get_db
 router = APIRouter(prefix="/event-flyers", tags=["Event Flyers"])
 FLYER_DIR = Path(__file__).resolve().parent.parent / "static" / "event-flyers"
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+logger = logging.getLogger(__name__)
+
+
+def _delete_flyer_and_registrations(db: Session, flyer: models.EventFlyer) -> list[Path]:
+    related_registrations = db.query(models.EventRegistration).filter(
+        models.EventRegistration.flyer_id == flyer.id
+    ).all()
+    paths_to_remove = []
+    if flyer.flyer_path:
+        paths_to_remove.append(FLYER_DIR / Path(flyer.flyer_path).name)
+    for registration in related_registrations:
+        if registration.registration_screenshot_path:
+            paths_to_remove.append(
+                FLYER_DIR.parent / "registration-screenshots" / Path(registration.registration_screenshot_path).name
+            )
+        db.delete(registration)
+    db.delete(flyer)
+    return paths_to_remove
+
+
+def _remove_files(paths: list[Path]) -> None:
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not remove deleted event flyer asset %s", path)
 
 
 def _parse_date(value: str | None):
@@ -34,19 +61,12 @@ def cleanup_expired_event_flyers(db: Session) -> int:
             continue
         expired_flyers.append(flyer)
 
+    files_to_remove = []
     for flyer in expired_flyers:
-        file_name = Path(flyer.flyer_path).name if flyer.flyer_path else None
-        if file_name:
-            file_path = FLYER_DIR / file_name
-            if file_path.exists():
-                try:
-                    file_path.unlink()
-                except OSError:
-                    pass
-        db.delete(flyer)
-
+        files_to_remove.extend(_delete_flyer_and_registrations(db, flyer))
     if expired_flyers:
         db.commit()
+        _remove_files(files_to_remove)
     return len(expired_flyers)
 
 
@@ -123,9 +143,7 @@ def delete_event_flyer(
         raise HTTPException(status_code=404, detail="Event flyer not found")
     if user["role"] != "admin" and flyer.uploaded_by != user["email"]:
         raise HTTPException(status_code=403, detail="You can delete only your own flyers")
-    file_path = FLYER_DIR / Path(flyer.flyer_path).name
-    if file_path.exists():
-        file_path.unlink()
-    db.delete(flyer)
+    files_to_remove = _delete_flyer_and_registrations(db, flyer)
     db.commit()
+    _remove_files(files_to_remove)
     return {"message": "Event flyer deleted"}
