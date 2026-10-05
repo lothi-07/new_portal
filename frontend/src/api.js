@@ -17,6 +17,9 @@ api.interceptors.request.use((config) => {
 // ---- Auth ----
 export const signup = (data) => api.post('/auth/signup', data)
 export const login = (data) => api.post('/auth/login', data)
+export const requestPasswordReset = (email) => api.post('/auth/password-reset/request', { email })
+export const confirmPasswordReset = (token, password) =>
+  api.post('/auth/password-reset/confirm', { token, password })
 export const googleLogin = (credential) => api.post('/auth/google', { credential })
 export const createStaffAccount = (data) => api.post('/auth/staff', data)
 export const listStaffAccounts = () => api.get('/auth/staff')

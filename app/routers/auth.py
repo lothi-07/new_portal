@@ -1,12 +1,23 @@
+import hashlib
+import logging
+import os
+import secrets
+import smtplib
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from .. import models, schemas
 from ..database import get_db
 from ..auth import hash_password, verify_password, create_access_token, verify_google_token, get_current_admin
+from ..email_service import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+logger = logging.getLogger(__name__)
+PASSWORD_RESET_EXPIRE_MINUTES = 30
 
 
 @router.post("/signup", response_model=schemas.TokenOut)
@@ -44,6 +55,94 @@ def login(payload: schemas.AdminLogin, db: Session = Depends(get_db)):
         db.commit()
     token = create_access_token({"email": user.email, "type": "local", "role": role})
     return {"access_token": token, "email": user.email, "name": user.name, "role": role}
+
+
+@router.post("/password-reset/request")
+def request_password_reset(payload: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).strip()
+    user = db.query(models.AdminUser).filter(func.lower(models.AdminUser.email) == email.lower()).first()
+    user = user or db.query(models.StaffUser).filter(func.lower(models.StaffUser.email) == email.lower()).first()
+    if not user or not user.is_active:
+        return {"message": "If an active account exists for that email, a reset link will be sent."}
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    reset_url = f"{frontend_url}/?reset_token={token}"
+
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == user.email,
+    ).delete(synchronize_session=False)
+    reset_record = models.PasswordResetToken(
+        email=user.email,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+    db.add(reset_record)
+    db.commit()
+    try:
+        send_password_reset_email(user.email, reset_url, PASSWORD_RESET_EXPIRE_MINUTES)
+    except (OSError, RuntimeError, ValueError, smtplib.SMTPException) as exc:
+        db.rollback()
+        logger.exception("Password reset email delivery failed")
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.token_hash == token_hash,
+        ).delete(synchronize_session=False)
+        db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail="The password reset email could not be sent. Please try again later or contact the portal administrator.",
+        ) from exc
+
+    return {"message": "If an active account exists for that email, a reset link will be sent."}
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(payload: schemas.PasswordResetConfirm, db: Session = Depends(get_db)):
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+    reset_record = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token_hash == token_hash,
+        models.PasswordResetToken.used_at.is_(None),
+    ).first()
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="This password reset link is invalid or has already been used")
+
+    expires_at = reset_record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= datetime.now(timezone.utc):
+        db.delete(reset_record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="This password reset link has expired. Request a new one.")
+
+    user = db.query(models.AdminUser).filter(models.AdminUser.email == reset_record.email).first()
+    if user is None:
+        user = db.query(models.StaffUser).filter(models.StaffUser.email == reset_record.email).first()
+    if not user or not user.is_active:
+        db.delete(reset_record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="This password reset link is no longer valid")
+
+    now = datetime.now(timezone.utc)
+    consumed = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.id == reset_record.id,
+        models.PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": now}, synchronize_session=False)
+    if consumed != 1:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="This password reset link is invalid or has already been used")
+
+    user.hashed_password = hash_password(payload.password)
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == reset_record.email,
+        models.PasswordResetToken.id != reset_record.id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
 @router.post("/google", response_model=schemas.TokenOut)

@@ -89,6 +89,15 @@ class AdminLogin(BaseModel):
     password: str
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    password: str
+
+
 class StaffCreate(AdminSignup):
     pass
 

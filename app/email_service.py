@@ -71,3 +71,32 @@ def send_certificate_deadline_reminder(
             smtp.ehlo()
         smtp.login(os.getenv("SMTP_USERNAME", sender), password)
         smtp.send_message(message)
+
+
+def send_password_reset_email(recipient: str, reset_url: str, expires_minutes: int) -> None:
+    host = os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER")
+    sender = os.getenv("SMTP_FROM") or os.getenv("SMTP_USERNAME")
+    password = os.getenv("SMTP_PASSWORD")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    if not host or not sender or not password:
+        raise RuntimeError(
+            "Email is not configured. Set SMTP_HOST/SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM."
+        )
+
+    message = EmailMessage()
+    message["Subject"] = "Reset your Achievement Portal password"
+    message["From"] = sender
+    message["To"] = recipient
+    message.set_content(
+        "A password reset was requested for your Achievement Portal account.\n\n"
+        f"Use this one-time link within {expires_minutes} minutes:\n{reset_url}\n\n"
+        "If you did not request this, you can ignore this email."
+    )
+
+    with smtplib.SMTP(host, port, timeout=20) as smtp:
+        smtp.ehlo()
+        if os.getenv("SMTP_USE_TLS", "true").lower() not in {"false", "0", "no"}:
+            smtp.starttls()
+            smtp.ehlo()
+        smtp.login(os.getenv("SMTP_USERNAME", sender), password)
+        smtp.send_message(message)

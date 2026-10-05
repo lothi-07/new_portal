@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
-import { login, signup, googleLogin, studentLogin } from './api'
+import { login, signup, googleLogin, studentLogin, requestPasswordReset, confirmPasswordReset } from './api'
 
 export default function LoginPage({ onLoggedIn }) {
-  const [loginType, setLoginType] = useState('student') // 'staff' | 'student'
+  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset_token') || '')
+  const [loginType, setLoginType] = useState(resetToken ? 'staff' : 'student') // 'staff' | 'student'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState('')
   const [loading, setLoading] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [signupName, setSignupName] = useState('')
 
   const [rollNo, setRollNo] = useState('')
@@ -42,6 +46,44 @@ export default function LoginPage({ onLoggedIn }) {
       onLoggedIn(res.data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Unable to create staff account. Please check your details.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const submitPasswordResetRequest = async (e) => {
+    e.preventDefault()
+    setError('')
+    setFeedback('')
+    setLoading(true)
+    try {
+      const res = await requestPasswordReset(email)
+      setFeedback(res.data.message)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Unable to send the reset email. Please try again later.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const submitPasswordReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setFeedback('')
+    if (password !== confirmPassword) {
+      setError('The passwords do not match.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await confirmPasswordReset(resetToken, password)
+      setFeedback(res.data.message)
+      setResetToken('')
+      setPassword('')
+      setConfirmPassword('')
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Unable to reset the password. Please request a new reset link.')
     } finally {
       setLoading(false)
     }
@@ -197,13 +239,17 @@ export default function LoginPage({ onLoggedIn }) {
           <div className="login-card" style={s.loginCard}>
             <div style={s.cardHeader}>
               <div style={s.cardBadge}>
-                {loginType === 'student' ? 'STUDENT ACCESS' : showSignup ? 'STAFF REGISTRATION' : 'STAFF ACCESS'}
+                {resetToken ? 'PASSWORD RESET' : showForgotPassword ? 'ACCOUNT RECOVERY' : loginType === 'student' ? 'STUDENT ACCESS' : showSignup ? 'STAFF REGISTRATION' : 'STAFF ACCESS'}
               </div>
               <h2 style={s.cardHeading}>
-                {loginType === 'student' ? 'Student Sign In' : showSignup ? 'Create Staff Account' : 'Staff Sign In'}
+                {resetToken ? 'Choose a New Password' : showForgotPassword ? 'Forgot Password?' : loginType === 'student' ? 'Student Sign In' : showSignup ? 'Create Staff Account' : 'Staff Sign In'}
               </h2>
               <p style={s.cardDesc}>
-                {loginType === 'student'
+                {resetToken
+                  ? 'Enter a new password for your staff or administrator account.'
+                  : showForgotPassword
+                  ? 'Enter your staff or administrator email and we will send a password reset link.'
+                  : loginType === 'student'
                   ? 'Enter your institutional Roll Number and registered Mobile Number.'
                   : showSignup
                   ? 'Register with your college email to manage events and student records.'
@@ -212,25 +258,84 @@ export default function LoginPage({ onLoggedIn }) {
             </div>
 
             {/* Role Switcher */}
-            <div style={s.roleSwitcher}>
+            {!showForgotPassword && !resetToken && <div style={s.roleSwitcher}>
               <button
                 type="button"
-                onClick={() => { setLoginType('student'); setShowSignup(false); setError('') }}
+                onClick={() => { setLoginType('student'); setShowSignup(false); setError(''); setFeedback('') }}
                 style={{ ...s.roleBtn, ...(loginType === 'student' ? s.roleBtnActive : {}) }}
               >
                 🎓 Student Portal
               </button>
               <button
                 type="button"
-                onClick={() => { setLoginType('staff'); setShowSignup(false); setError('') }}
+                onClick={() => { setLoginType('staff'); setShowSignup(false); setError(''); setFeedback('') }}
                 style={{ ...s.roleBtn, ...(loginType === 'staff' ? s.roleBtnActive : {}) }}
               >
                 💼 Faculty & Admin
               </button>
-            </div>
+            </div>}
 
             {/* Form Area */}
-            {loginType === 'student' ? (
+            {resetToken ? (
+              <form onSubmit={submitPasswordReset} style={s.form}>
+                <div style={s.inputGroup}>
+                  <label style={s.label}>New Password</label>
+                  <input
+                    style={s.input}
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+                <div style={s.inputGroup}>
+                  <label style={s.label}>Confirm New Password</label>
+                  <input
+                    style={s.input}
+                    type="password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    minLength={8}
+                    autoComplete="new-password"
+                    required
+                  />
+                </div>
+                {error && <div style={s.errorAlert}>{error}</div>}
+                {feedback && <div style={s.successAlert}>{feedback}</div>}
+                <button type="submit" style={s.submitBtn} disabled={loading}>
+                  {loading ? 'Updating Password...' : 'Set New Password →'}
+                </button>
+              </form>
+            ) : showForgotPassword ? (
+              <form onSubmit={submitPasswordResetRequest} style={s.form}>
+                <div style={s.inputGroup}>
+                  <label style={s.label}>Staff or Administrator Email</label>
+                  <input
+                    style={s.input}
+                    type="email"
+                    placeholder="faculty@esec.ac.in"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+                {error && <div style={s.errorAlert}>{error}</div>}
+                {feedback && <div style={s.successAlert}>{feedback}</div>}
+                <button type="submit" style={s.submitBtn} disabled={loading}>
+                  {loading ? 'Sending...' : 'Send Reset Link →'}
+                </button>
+                <div style={s.cardFooter}>
+                  <p style={s.footerText}>
+                    <button type="button" style={s.toggleLink} onClick={() => { setShowForgotPassword(false); setError(''); setFeedback('') }}>
+                      Back to Staff Sign In
+                    </button>
+                  </p>
+                </div>
+              </form>
+            ) : loginType === 'student' ? (
               <form onSubmit={submitStudentLogin} style={s.form}>
                 <div style={s.inputGroup}>
                   <label style={s.label}>Roll Number</label>
@@ -323,7 +428,20 @@ export default function LoginPage({ onLoggedIn }) {
                     />
                   </div>
 
+                  {!showSignup && (
+                    <div style={{ textAlign: 'right', marginTop: -8 }}>
+                      <button
+                        type="button"
+                        style={s.toggleLink}
+                        onClick={() => { setShowForgotPassword(true); setError(''); setFeedback('') }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+
                   {error && <div style={s.errorAlert}>{error}</div>}
+                  {feedback && <div style={s.successAlert}>{feedback}</div>}
 
                   <button type="submit" style={s.submitBtn} disabled={loading}>
                     {loading
@@ -654,6 +772,16 @@ const s = {
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#dc2626',
+    fontSize: 12.5,
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+  successAlert: {
+    padding: '10px 14px',
+    borderRadius: 8,
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#047857',
     fontSize: 12.5,
     fontWeight: 600,
     textAlign: 'center',

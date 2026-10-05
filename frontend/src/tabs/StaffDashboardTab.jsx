@@ -35,8 +35,8 @@ export default function StaffDashboardTab() {
   }), [mentees])
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <div style={s.headerRow}>
+    <div className="staff-dashboard" style={{ animation: 'fadeIn 0.3s ease' }}>
+      <div className="staff-dashboard-header" style={s.headerRow}>
         <div>
           <div style={s.headerBadge}>MENTOR DASHBOARD</div>
           <h1 style={sh.pageTitle}>My Mentees</h1>
@@ -46,7 +46,7 @@ export default function StaffDashboardTab() {
         <button style={sh.btnGhost} onClick={loadMentees}>↻ Refresh</button>
       </div>
 
-      <div style={s.statsGrid}>
+      <div className="staff-dashboard-stats" style={s.statsGrid}>
         <SummaryCard icon="👥" value={mentees.length} label="Assigned Mentees" />
         <SummaryCard icon="🏆" value={summary.achievements} label="Total Achievements" />
         <SummaryCard icon="📜" value={summary.certificates} label="Verified Certificates" />
@@ -74,9 +74,10 @@ export default function StaffDashboardTab() {
         {!loading && !error && mentees.length > 0 && (
           <div style={s.menteeList}>
             {mentees.map(student => (
-              <div key={student.id} style={s.menteeCard}>
+              <div key={student.id} className="staff-mentee-card" style={s.menteeCard}>
                 <button
                   type="button"
+                  className="staff-mentee-summary"
                   style={s.menteeSummary}
                   onClick={() => setExpandedId(expandedId === student.id ? null : student.id)}
                 >
@@ -137,7 +138,7 @@ function SummaryCard({ icon, value, label }) {
 function MenteeDetails({ student, onViewCertificate }) {
   return (
     <div style={s.details}>
-      <div style={s.detailGrid}>
+      <div className="staff-mentee-detail-grid" style={s.detailGrid}>
         <Detail label="Registration No" value={student.reg_no || 'Not provided'} />
         <Detail label="Email" value={student.email || 'Not provided'} />
         <Detail label="Mobile" value={student.mobile_number || 'Not provided'} />
@@ -147,9 +148,9 @@ function MenteeDetails({ student, onViewCertificate }) {
       {student.achievements.length === 0 ? (
         <div style={s.noHistory}>No achievements recorded yet. This student can still be monitored and guided.</div>
       ) : (
-        <div style={s.historyList}>
+        <div className="staff-mentee-history-list" style={s.historyList}>
           {student.achievements.map(item => (
-            <div key={item.id} style={s.historyRow}>
+            <div key={item.id} className="staff-mentee-history-row" style={s.historyRow}>
               <div><strong>{item.event_name}</strong><div style={s.historyMeta}>{item.event_date || 'Date not provided'} · {item.event_type || 'Other'}</div></div>
               <span style={s.prize}>{item.prize_type || 'Participation'}</span>
               {item.certificate_upload_path && (
